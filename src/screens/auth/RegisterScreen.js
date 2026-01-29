@@ -12,6 +12,7 @@ import {
 import { useMutation } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REGISTER } from '../../graphql/mutations';
+import { validateEmail, validatePassword, validateName, validatePasswordMatch } from '../../utils/validators';
 
 const RegisterScreen = ({ navigation, onAuthSuccess }) => {
   const [name, setName] = useState('');
@@ -19,6 +20,18 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('buyer');
+
+  // CHANGE: Add validation error states
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const [touched, setTouched] = useState({
+    name: false,
+    email: false,
+    password: false,
+    confirmPassword: false,
+  });
 
   const [register, { loading }] = useMutation(REGISTER, {
     onCompleted: async (data) => {
@@ -29,7 +42,6 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
         await AsyncStorage.setItem('userId', data.register.user.id);
         
         Alert.alert('Success', 'Account created successfully!');
-        // CHANGE: Use the passed onAuthSuccess callback instead of route params
         if (onAuthSuccess) {
           onAuthSuccess();
         }
@@ -42,30 +54,123 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
     },
   });
 
+  // CHANGE: Real-time validation handlers
+  const handleNameChange = (text) => {
+    setName(text);
+    if (touched.name) {
+      const validation = validateName(text);
+      setNameError(validation.error);
+    }
+  };
+
+  const handleEmailChange = (text) => {
+    setEmail(text);
+    if (touched.email) {
+      const validation = validateEmail(text);
+      setEmailError(validation.error);
+    }
+  };
+
+  const handlePasswordChange = (text) => {
+    setPassword(text);
+    if (touched.password) {
+      const validation = validatePassword(text);
+      setPasswordError(validation.error);
+    }
+    // CHANGE: Re-validate confirm password if it's been touched
+    if (touched.confirmPassword && confirmPassword) {
+      const matchValidation = validatePasswordMatch(text, confirmPassword);
+      setConfirmPasswordError(matchValidation.error);
+    }
+  };
+
+  const handleConfirmPasswordChange = (text) => {
+    setConfirmPassword(text);
+    if (touched.confirmPassword) {
+      const validation = validatePasswordMatch(password, text);
+      setConfirmPasswordError(validation.error);
+    }
+  };
+
+  // CHANGE: Blur handlers
+  const handleNameBlur = () => {
+    setTouched(prev => ({ ...prev, name: true }));
+    const validation = validateName(name);
+    setNameError(validation.error);
+  };
+
+  const handleEmailBlur = () => {
+    setTouched(prev => ({ ...prev, email: true }));
+    const validation = validateEmail(email);
+    setEmailError(validation.error);
+  };
+
+  const handlePasswordBlur = () => {
+    setTouched(prev => ({ ...prev, password: true }));
+    const validation = validatePassword(password);
+    setPasswordError(validation.error);
+  };
+
+  const handleConfirmPasswordBlur = () => {
+    setTouched(prev => ({ ...prev, confirmPassword: true }));
+    const validation = validatePasswordMatch(password, confirmPassword);
+    setConfirmPasswordError(validation.error);
+  };
+
+  // CHANGE: Enhanced validation before submission
   const handleRegister = () => {
-    if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+    // CHANGE: Mark all fields as touched
+    setTouched({
+      name: true,
+      email: true,
+      password: true,
+      confirmPassword: true,
+    });
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
+    // CHANGE: Validate all fields
+    const nameValidation = validateName(name);
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+    const confirmPasswordValidation = validatePasswordMatch(password, confirmPassword);
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    setNameError(nameValidation.error);
+    setEmailError(emailValidation.error);
+    setPasswordError(passwordValidation.error);
+    setConfirmPasswordError(confirmPasswordValidation.error);
+
+    // CHANGE: Stop if validation fails
+    if (
+      !nameValidation.isValid ||
+      !emailValidation.isValid ||
+      !passwordValidation.isValid ||
+      !confirmPasswordValidation.isValid
+    ) {
       return;
     }
 
     register({
       variables: {
-        name,
-        email: email.toLowerCase(),
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
         password,
         role,
       },
     });
+  };
+
+  // CHANGE: Check if form is valid
+  const isFormValid = () => {
+    const nameValidation = validateName(name);
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+    const confirmPasswordValidation = validatePasswordMatch(password, confirmPassword);
+
+    return (
+      nameValidation.isValid &&
+      emailValidation.isValid &&
+      passwordValidation.isValid &&
+      confirmPasswordValidation.isValid
+    );
   };
 
   return (
@@ -73,37 +178,61 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
       <View style={styles.content}>
         <Text style={styles.title}>Create Account</Text>
         
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name"
-          value={name}
-          onChangeText={setName}
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[styles.input, nameError && touched.name && styles.inputError]}
+            placeholder="Full Name"
+            value={name}
+            onChangeText={handleNameChange}
+            onBlur={handleNameBlur}
+          />
+          {nameError && touched.name && (
+            <Text style={styles.errorText}>{nameError}</Text>
+          )}
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[styles.input, emailError && touched.email && styles.inputError]}
+            placeholder="Email"
+            value={email}
+            onChangeText={handleEmailChange}
+            onBlur={handleEmailBlur}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          {emailError && touched.email && (
+            <Text style={styles.errorText}>{emailError}</Text>
+          )}
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[styles.input, passwordError && touched.password && styles.inputError]}
+            placeholder="Password"
+            value={password}
+            onChangeText={handlePasswordChange}
+            onBlur={handlePasswordBlur}
+            secureTextEntry
+          />
+          {passwordError && touched.password && (
+            <Text style={styles.errorText}>{passwordError}</Text>
+          )}
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm Password"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[styles.input, confirmPasswordError && touched.confirmPassword && styles.inputError]}
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChangeText={handleConfirmPasswordChange}
+            onBlur={handleConfirmPasswordBlur}
+            secureTextEntry
+          />
+          {confirmPasswordError && touched.confirmPassword && (
+            <Text style={styles.errorText}>{confirmPasswordError}</Text>
+          )}
+        </View>
 
         <Text style={styles.label}>I want to:</Text>
         <View style={styles.roleContainer}>
@@ -127,9 +256,9 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
         </View>
 
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, !isFormValid() && styles.buttonDisabled]}
           onPress={handleRegister}
-          disabled={loading}
+          disabled={loading || !isFormValid()}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -165,18 +294,34 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     color: '#333',
   },
+  // CHANGE: Add input container for error message spacing
+  inputContainer: {
+    marginBottom: 15,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 15,
-    marginBottom: 15,
     fontSize: 16,
+  },
+  // CHANGE: Add error state styling
+  inputError: {
+    borderColor: '#ff3b30',
+    borderWidth: 2,
+  },
+  // CHANGE: Add error text styling
+  errorText: {
+    color: '#ff3b30',
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 5,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 10,
+    marginTop: 5,
     color: '#333',
   },
   roleContainer: {
@@ -210,6 +355,11 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: 'center',
     marginTop: 10,
+  },
+  // CHANGE: Add disabled button styling
+  buttonDisabled: {
+    backgroundColor: '#B0D4FF',
+    opacity: 0.6,
   },
   buttonText: {
     color: '#fff',

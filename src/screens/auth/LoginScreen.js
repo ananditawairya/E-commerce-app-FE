@@ -11,32 +11,33 @@ import {
 import { useMutation } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LOGIN } from '../../graphql/mutations';
+import { validateEmail, validatePassword } from '../../utils/validators';
 
 const LoginScreen = ({ navigation, onAuthSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // CHANGE: Add validation error states
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [touched, setTouched] = useState({ email: false, password: false });
 
   const [login, { loading }] = useMutation(LOGIN, {
     onCompleted: async (data) => {
       try {
-        // CHANGE: Enhanced token storage with validation and error handling
         const { accessToken, refreshToken } = data.login;
         const { id, role } = data.login.user;
 
-        // CHANGE: Validate tokens before storing
         if (!accessToken || !refreshToken || !id || !role) {
           throw new Error('Invalid login response data');
         }
 
         console.log('Login Success - Storing tokens and user data');
         
-        // CHANGE: Store tokens and user data with error handling for each operation
         await AsyncStorage.setItem('accessToken', accessToken);
         await AsyncStorage.setItem('refreshToken', refreshToken);
         await AsyncStorage.setItem('userRole', role);
         await AsyncStorage.setItem('userId', id);
         
-        // CHANGE: Verify storage by reading back the values
         const storedToken = await AsyncStorage.getItem('accessToken');
         const storedRole = await AsyncStorage.getItem('userRole');
         
@@ -52,7 +53,6 @@ const LoginScreen = ({ navigation, onAuthSuccess }) => {
         
         Alert.alert('Success', 'Login successful!');
         
-        // CHANGE: Use callback with slight delay to ensure storage completion
         if (onAuthSuccess) {
           setTimeout(() => {
             onAuthSuccess();
@@ -69,20 +69,51 @@ const LoginScreen = ({ navigation, onAuthSuccess }) => {
     },
   });
 
+  // CHANGE: Real-time email validation
+  const handleEmailChange = (text) => {
+    setEmail(text);
+    if (touched.email) {
+      const validation = validateEmail(text);
+      setEmailError(validation.error);
+    }
+  };
+
+  // CHANGE: Real-time password validation
+  const handlePasswordChange = (text) => {
+    setPassword(text);
+    if (touched.password) {
+      const validation = validatePassword(text);
+      setPasswordError(validation.error);
+    }
+  };
+
+  // CHANGE: Validate on blur
+  const handleEmailBlur = () => {
+    setTouched(prev => ({ ...prev, email: true }));
+    const validation = validateEmail(email);
+    setEmailError(validation.error);
+  };
+
+  const handlePasswordBlur = () => {
+    setTouched(prev => ({ ...prev, password: true }));
+    const validation = validatePassword(password);
+    setPasswordError(validation.error);
+  };
+
+  // CHANGE: Enhanced validation before submission
   const handleLogin = () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+    // CHANGE: Mark all fields as touched
+    setTouched({ email: true, password: true });
 
-    // CHANGE: Add input validation
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
+    // CHANGE: Validate all fields
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    setEmailError(emailValidation.error);
+    setPasswordError(passwordValidation.error);
+
+    // CHANGE: Stop if validation fails
+    if (!emailValidation.isValid || !passwordValidation.isValid) {
       return;
     }
 
@@ -93,35 +124,54 @@ const LoginScreen = ({ navigation, onAuthSuccess }) => {
     });
   };
 
+  // CHANGE: Disable login button if validation fails
+  const isFormValid = () => {
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+    return emailValidation.isValid && passwordValidation.isValid;
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome Back</Text>
       <Text style={styles.subtitle}>Sign in to continue</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoCorrect={false}
-        autoComplete="email"
-      />
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={[styles.input, emailError && touched.email && styles.inputError]}
+          placeholder="Email"
+          value={email}
+          onChangeText={handleEmailChange}
+          onBlur={handleEmailBlur}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoCorrect={false}
+          autoComplete="email"
+        />
+        {emailError && touched.email && (
+          <Text style={styles.errorText}>{emailError}</Text>
+        )}
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoComplete="password"
-      />
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={[styles.input, passwordError && touched.password && styles.inputError]}
+          placeholder="Password"
+          value={password}
+          onChangeText={handlePasswordChange}
+          onBlur={handlePasswordBlur}
+          secureTextEntry
+          autoComplete="password"
+        />
+        {passwordError && touched.password && (
+          <Text style={styles.errorText}>{passwordError}</Text>
+        )}
+      </View>
 
       <TouchableOpacity
-        style={styles.button}
+        style={[styles.button, !isFormValid() && styles.buttonDisabled]}
         onPress={handleLogin}
-        disabled={loading}
+        disabled={loading || !isFormValid()}
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
@@ -160,13 +210,28 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 40,
   },
+  // CHANGE: Add input container for error message spacing
+  inputContainer: {
+    marginBottom: 15,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 15,
-    marginBottom: 15,
     fontSize: 16,
+  },
+  // CHANGE: Add error state styling
+  inputError: {
+    borderColor: '#ff3b30',
+    borderWidth: 2,
+  },
+  // CHANGE: Add error text styling
+  errorText: {
+    color: '#ff3b30',
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 5,
   },
   button: {
     backgroundColor: '#007AFF',
@@ -174,6 +239,11 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: 'center',
     marginTop: 10,
+  },
+  // CHANGE: Add disabled button styling
+  buttonDisabled: {
+    backgroundColor: '#B0D4FF',
+    opacity: 0.6,
   },
   buttonText: {
     color: '#fff',

@@ -53,11 +53,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
       navigation.goBack();
     },
     onError: async (error) => {
-      console.error('Add to cart error:', {
-        message: error.message,
-        graphQLErrors: error.graphQLErrors,
-        networkError: error.networkError,
-      });
+      console.error('Add to cart error:', error);
       
       if (error.message.includes('Authentication failed') || error.message.includes('Unauthorized')) {
         try {
@@ -116,44 +112,17 @@ const ProductDetailScreen = ({ route, navigation }) => {
     },
   });
 
-  // CHANGE: Use effectivePrice from variant if available, otherwise calculate
   const calculatePrice = () => {
     if (!selectedVariant) return product.basePrice;
-    
-    // CHANGE: Use effectivePrice from backend if available
-    if (selectedVariant.effectivePrice !== undefined) {
-      return selectedVariant.effectivePrice;
-    }
-    
-    // Fallback to manual calculation
-    return product.basePrice + (selectedVariant.priceModifier || 0);
+    return product.basePrice + selectedVariant.priceModifier;
   };
 
-  // CHANGE: Get effective images for display (variant images or product images)
-  const getDisplayImages = () => {
-    if (selectedVariant && selectedVariant.effectiveImages && selectedVariant.effectiveImages.length > 0) {
-      return selectedVariant.effectiveImages;
+  // CHANGE: Check if selected variant or product is out of stock
+  const isOutOfStock = () => {
+    if (selectedVariant) {
+      return selectedVariant.stock === 0;
     }
-    
-    if (selectedVariant && selectedVariant.images && selectedVariant.images.length > 0) {
-      return selectedVariant.images;
-    }
-    
-    return product.images || [];
-  };
-
-  // CHANGE: Get effective description (variant description or product description)
-  const getDisplayDescription = () => {
-    if (selectedVariant && selectedVariant.effectiveDescription) {
-      return selectedVariant.effectiveDescription;
-    }
-    
-    if (selectedVariant && selectedVariant.description) {
-      return selectedVariant.description;
-    }
-    
-    // CHANGE: Use formattedDescription if available
-    return product.formattedDescription || product.description;
+    return false;
   };
 
   const handleAddToCart = async () => {
@@ -214,30 +183,17 @@ const ProductDetailScreen = ({ route, navigation }) => {
     addToCart({ variables });
   };
 
-  // CHANGE: Get display images and reset index when variant changes
-  const displayImages = getDisplayImages();
-  const displayDescription = getDisplayDescription();
-
-  // CHANGE: Reset image index when variant changes
-  React.useEffect(() => {
-    setCurrentImageIndex(0);
-  }, [selectedVariant?.id]);
-
   return (
     <ScrollView style={styles.container}>
-      {displayImages && displayImages.length > 0 ? (
+      {product.images && product.images.length > 0 ? (
         <View>
           <Image
-            source={{ uri: displayImages[currentImageIndex] }}
+            source={{ uri: product.images[currentImageIndex] }}
             style={styles.mainImage}
-            // CHANGE: Add error handling for image loading
-            onError={(error) => {
-              console.error('Image load error:', error.nativeEvent.error);
-            }}
           />
-          {displayImages.length > 1 && (
+          {product.images.length > 1 && (
             <View style={styles.imageIndicators}>
-              {displayImages.map((_, index) => (
+              {product.images.map((_, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
@@ -262,8 +218,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
         <Text style={styles.price}>${calculatePrice().toFixed(2)}</Text>
 
         <Text style={styles.sectionTitle}>Description</Text>
-        {/* CHANGE: Display formatted description with proper line breaks */}
-        <Text style={styles.description}>{displayDescription}</Text>
+        <Text style={styles.description}>{product.description}</Text>
 
         {product.variants && product.variants.length > 0 && (
           <>
@@ -274,67 +229,87 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 style={[
                   styles.variantCard,
                   selectedVariant?.id === variant.id && styles.variantCardActive,
+                  variant.stock === 0 && styles.variantCardOutOfStock,
                 ]}
-                onPress={() => setSelectedVariant(variant)}
+                onPress={() => {
+                  setSelectedVariant(variant);
+                  setQuantity(1);
+                }}
+                disabled={variant.stock === 0}
               >
                 <View style={styles.variantInfo}>
-                  <Text style={styles.variantName}>{variant.name}</Text>
-                  <Text style={styles.variantStock}>Stock: {variant.stock}</Text>
-                  {/* CHANGE: Show variant-specific image count if available */}
-                  {variant.images && variant.images.length > 0 && (
-                    <Text style={styles.variantImageCount}>
-                      {variant.images.length} image{variant.images.length > 1 ? 's' : ''}
-                    </Text>
-                  )}
+                  <Text style={[
+                    styles.variantName,
+                    variant.stock === 0 && styles.variantNameOutOfStock
+                  ]}>
+                    {variant.name}
+                  </Text>
+                  <Text style={[
+                    styles.variantStock,
+                    variant.stock === 0 && styles.outOfStockText
+                  ]}>
+                    {variant.stock === 0 ? 'Out of Stock' : `Stock: ${variant.stock}`}
+                  </Text>
                 </View>
-                <Text style={styles.variantPrice}>
-                  {/* CHANGE: Use effectivePrice if available */}
-                  ${(variant.effectivePrice !== undefined 
-                    ? variant.effectivePrice 
-                    : product.basePrice + (variant.priceModifier || 0)
-                  ).toFixed(2)}
+                <Text style={[
+                  styles.variantPrice,
+                  variant.stock === 0 && styles.variantPriceOutOfStock
+                ]}>
+                  {variant.priceModifier >= 0 ? '+' : ''}
+                  ${variant.priceModifier.toFixed(2)}
                 </Text>
               </TouchableOpacity>
             ))}
           </>
         )}
 
-        <View style={styles.quantityContainer}>
-          <Text style={styles.sectionTitle}>Quantity</Text>
-          <View style={styles.quantityControls}>
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={() => setQuantity(Math.max(1, quantity - 1))}
-            >
-              <MaterialIcons name="remove" size={20} color="#007AFF" />
-            </TouchableOpacity>
-            <Text style={styles.quantityText}>{quantity}</Text>
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={() => setQuantity(quantity + 1)}
-              // CHANGE: Disable if exceeds stock
-              disabled={selectedVariant && quantity >= selectedVariant.stock}
-            >
-              <MaterialIcons name="add" size={20} color="#007AFF" />
-            </TouchableOpacity>
+        {/* CHANGE: Conditionally render quantity controls or out of stock message */}
+        {isOutOfStock() ? (
+          <View style={styles.outOfStockContainer}>
+            <MaterialIcons name="inventory-2" size={48} color="#ff3b30" />
+            <Text style={styles.outOfStockMessage}>This item is currently out of stock</Text>
+            <Text style={styles.outOfStockSubtext}>Please check back later or select a different variant</Text>
           </View>
-        </View>
+        ) : (
+          <View style={styles.quantityContainer}>
+            <Text style={styles.sectionTitle}>Quantity</Text>
+            <View style={styles.quantityControls}>
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={() => setQuantity(Math.max(1, quantity - 1))}
+              >
+                <MaterialIcons name="remove" size={20} color="#007AFF" />
+              </TouchableOpacity>
+              <Text style={styles.quantityText}>{quantity}</Text>
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={() => setQuantity(quantity + 1)}
+              >
+                <MaterialIcons name="add" size={20} color="#007AFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
-        <TouchableOpacity
-          style={styles.addToCartButton}
-          onPress={handleAddToCart}
-          disabled={loading || (selectedVariant && selectedVariant.stock === 0)}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.addToCartText}>
-              {selectedVariant && selectedVariant.stock === 0
-                ? 'Out of Stock'
-                : 'Add to Cart'}
-            </Text>
-          )}
-        </TouchableOpacity>
+        {/* CHANGE: Show different button based on stock availability */}
+        {isOutOfStock() ? (
+          <View style={styles.outOfStockButton}>
+            <MaterialIcons name="block" size={20} color="#fff" />
+            <Text style={styles.outOfStockButtonText}>Out of Stock</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.addToCartButton}
+            onPress={handleAddToCart}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.addToCartText}>Add to Cart</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </ScrollView>
   );
@@ -344,12 +319,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  // CHANGE: Add header back button style
-  headerBackButton: {
-    paddingLeft: 15,
-    paddingRight: 10,
-    paddingVertical: 10,
   },
   mainImage: {
     width: '100%',
@@ -419,10 +388,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     marginBottom: 10,
+    backgroundColor: '#fff',
   },
   variantCardActive: {
     borderColor: '#007AFF',
     backgroundColor: '#f0f8ff',
+  },
+  // CHANGE: Add styling for out of stock variants
+  variantCardOutOfStock: {
+    borderColor: '#ffcccc',
+    backgroundColor: '#fff5f5',
+    opacity: 0.7,
   },
   variantInfo: {
     flex: 1,
@@ -433,21 +409,28 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 4,
   },
+  // CHANGE: Add styling for out of stock variant name
+  variantNameOutOfStock: {
+    color: '#999',
+    textDecorationLine: 'line-through',
+  },
   variantStock: {
     fontSize: 12,
     color: '#666',
   },
-  // CHANGE: Added style for variant image count display
-  variantImageCount: {
-    fontSize: 11,
-    color: '#007AFF',
-    marginTop: 2,
-    fontStyle: 'italic',
+  // CHANGE: Add styling for out of stock text
+  outOfStockText: {
+    color: '#ff3b30',
+    fontWeight: '600',
   },
   variantPrice: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#007AFF',
+  },
+  // CHANGE: Add styling for out of stock variant price
+  variantPriceOutOfStock: {
+    color: '#999',
   },
   quantityContainer: {
     marginTop: 10,
@@ -473,6 +456,30 @@ const styles = StyleSheet.create({
     minWidth: 30,
     textAlign: 'center',
   },
+  // CHANGE: Add out of stock container styling
+  outOfStockContainer: {
+    marginTop: 20,
+    marginBottom: 10,
+    padding: 30,
+    backgroundColor: '#fff5f5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ffcccc',
+    alignItems: 'center',
+  },
+  outOfStockMessage: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ff3b30',
+    marginTop: 15,
+    textAlign: 'center',
+  },
+  outOfStockSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   addToCartButton: {
     backgroundColor: '#007AFF',
     borderRadius: 8,
@@ -482,6 +489,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addToCartText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // CHANGE: Add out of stock button styling
+  outOfStockButton: {
+    backgroundColor: '#ff3b30',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 30,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    opacity: 0.6,
+  },
+  outOfStockButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',

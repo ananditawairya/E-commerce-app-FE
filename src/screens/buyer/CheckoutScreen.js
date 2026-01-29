@@ -12,6 +12,13 @@ import {
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_MY_CART } from '../../graphql/queries';
 import { CHECKOUT } from '../../graphql/mutations';
+import {
+  validateStreet,
+  validateCity,
+  validateState,
+  validateZipCode,
+  validateCountry,
+} from '../../utils/validators';
 
 const CheckoutScreen = ({ navigation }) => {
   const [street, setStreet] = useState('');
@@ -19,6 +26,20 @@ const CheckoutScreen = ({ navigation }) => {
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [country, setCountry] = useState('');
+
+  // CHANGE: Add validation error states
+  const [streetError, setStreetError] = useState('');
+  const [cityError, setCityError] = useState('');
+  const [stateError, setStateError] = useState('');
+  const [zipCodeError, setZipCodeError] = useState('');
+  const [countryError, setCountryError] = useState('');
+  const [touched, setTouched] = useState({
+    street: false,
+    city: false,
+    state: false,
+    zipCode: false,
+    country: false,
+  });
 
   const { data, loading: cartLoading } = useQuery(GET_MY_CART);
 
@@ -41,23 +62,142 @@ const CheckoutScreen = ({ navigation }) => {
     },
   });
 
+  // CHANGE: Real-time validation handlers
+  const handleStreetChange = (text) => {
+    setStreet(text);
+    if (touched.street) {
+      const validation = validateStreet(text);
+      setStreetError(validation.error);
+    }
+  };
+
+  const handleCityChange = (text) => {
+    setCity(text);
+    if (touched.city) {
+      const validation = validateCity(text);
+      setCityError(validation.error);
+    }
+  };
+
+  const handleStateChange = (text) => {
+    setState(text);
+    if (touched.state) {
+      const validation = validateState(text);
+      setStateError(validation.error);
+    }
+  };
+
+  const handleZipCodeChange = (text) => {
+    setZipCode(text);
+    if (touched.zipCode) {
+      const validation = validateZipCode(text);
+      setZipCodeError(validation.error);
+    }
+  };
+
+  const handleCountryChange = (text) => {
+    setCountry(text);
+    if (touched.country) {
+      const validation = validateCountry(text);
+      setCountryError(validation.error);
+    }
+  };
+
+  // CHANGE: Blur handlers
+  const handleStreetBlur = () => {
+    setTouched(prev => ({ ...prev, street: true }));
+    const validation = validateStreet(street);
+    setStreetError(validation.error);
+  };
+
+  const handleCityBlur = () => {
+    setTouched(prev => ({ ...prev, city: true }));
+    const validation = validateCity(city);
+    setCityError(validation.error);
+  };
+
+  const handleStateBlur = () => {
+    setTouched(prev => ({ ...prev, state: true }));
+    const validation = validateState(state);
+    setStateError(validation.error);
+  };
+
+  const handleZipCodeBlur = () => {
+    setTouched(prev => ({ ...prev, zipCode: true }));
+    const validation = validateZipCode(zipCode);
+    setZipCodeError(validation.error);
+  };
+
+  const handleCountryBlur = () => {
+    setTouched(prev => ({ ...prev, country: true }));
+    const validation = validateCountry(country);
+    setCountryError(validation.error);
+  };
+
+  // CHANGE: Enhanced validation before submission
   const handleCheckout = () => {
-    if (!street || !city || !state || !zipCode || !country) {
-      Alert.alert('Error', 'Please fill in all address fields');
+    // CHANGE: Mark all fields as touched
+    setTouched({
+      street: true,
+      city: true,
+      state: true,
+      zipCode: true,
+      country: true,
+    });
+
+    // CHANGE: Validate all fields
+    const streetValidation = validateStreet(street);
+    const cityValidation = validateCity(city);
+    const stateValidation = validateState(state);
+    const zipCodeValidation = validateZipCode(zipCode);
+    const countryValidation = validateCountry(country);
+
+    setStreetError(streetValidation.error);
+    setCityError(cityValidation.error);
+    setStateError(stateValidation.error);
+    setZipCodeError(zipCodeValidation.error);
+    setCountryError(countryValidation.error);
+
+    // CHANGE: Stop if validation fails
+    if (
+      !streetValidation.isValid ||
+      !cityValidation.isValid ||
+      !stateValidation.isValid ||
+      !zipCodeValidation.isValid ||
+      !countryValidation.isValid
+    ) {
+      Alert.alert('Validation Error', 'Please fix all errors before proceeding');
       return;
     }
 
     checkout({
       variables: {
         shippingAddress: {
-          street,
-          city,
-          state,
-          zipCode,
-          country,
+          street: street.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          zipCode: zipCode.trim(),
+          country: country.trim(),
         },
       },
     });
+  };
+
+  // CHANGE: Check if form is valid
+  const isFormValid = () => {
+    const streetValidation = validateStreet(street);
+    const cityValidation = validateCity(city);
+    const stateValidation = validateState(state);
+    const zipCodeValidation = validateZipCode(zipCode);
+    const countryValidation = validateCountry(country);
+
+    return (
+      streetValidation.isValid &&
+      cityValidation.isValid &&
+      stateValidation.isValid &&
+      zipCodeValidation.isValid &&
+      countryValidation.isValid
+    );
   };
 
   if (cartLoading) {
@@ -74,41 +214,71 @@ const CheckoutScreen = ({ navigation }) => {
     <ScrollView style={styles.container}>
       <Text style={styles.sectionTitle}>Shipping Address</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Street Address"
-        value={street}
-        onChangeText={setStreet}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="City"
-        value={city}
-        onChangeText={setCity}
-      />
-
-      <View style={styles.row}>
+      <View style={styles.inputContainer}>
         <TextInput
-          style={[styles.input, styles.halfInput]}
-          placeholder="State"
-          value={state}
-          onChangeText={setState}
+          style={[styles.input, streetError && touched.street && styles.inputError]}
+          placeholder="Street Address"
+          value={street}
+          onChangeText={handleStreetChange}
+          onBlur={handleStreetBlur}
         />
-        <TextInput
-          style={[styles.input, styles.halfInput]}
-          placeholder="ZIP Code"
-          value={zipCode}
-          onChangeText={setZipCode}
-        />
+        {streetError && touched.street && (
+          <Text style={styles.errorText}>{streetError}</Text>
+        )}
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Country"
-        value={country}
-        onChangeText={setCountry}
-      />
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={[styles.input, cityError && touched.city && styles.inputError]}
+          placeholder="City"
+          value={city}
+          onChangeText={handleCityChange}
+          onBlur={handleCityBlur}
+        />
+        {cityError && touched.city && (
+          <Text style={styles.errorText}>{cityError}</Text>
+        )}
+      </View>
+
+      <View style={styles.row}>
+        <View style={[styles.inputContainer, styles.halfInput]}>
+          <TextInput
+            style={[styles.input, stateError && touched.state && styles.inputError]}
+            placeholder="State"
+            value={state}
+            onChangeText={handleStateChange}
+            onBlur={handleStateBlur}
+          />
+          {stateError && touched.state && (
+            <Text style={styles.errorText}>{stateError}</Text>
+          )}
+        </View>
+        <View style={[styles.inputContainer, styles.halfInput]}>
+          <TextInput
+            style={[styles.input, zipCodeError && touched.zipCode && styles.inputError]}
+            placeholder="ZIP Code"
+            value={zipCode}
+            onChangeText={handleZipCodeChange}
+            onBlur={handleZipCodeBlur}
+          />
+          {zipCodeError && touched.zipCode && (
+            <Text style={styles.errorText}>{zipCodeError}</Text>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={[styles.input, countryError && touched.country && styles.inputError]}
+          placeholder="Country"
+          value={country}
+          onChangeText={handleCountryChange}
+          onBlur={handleCountryBlur}
+        />
+        {countryError && touched.country && (
+          <Text style={styles.errorText}>{countryError}</Text>
+        )}
+      </View>
 
       <Text style={styles.sectionTitle}>Order Summary</Text>
       <View style={styles.summaryCard}>
@@ -129,9 +299,9 @@ const CheckoutScreen = ({ navigation }) => {
       </Text>
 
       <TouchableOpacity
-        style={styles.placeOrderButton}
+        style={[styles.placeOrderButton, !isFormValid() && styles.placeOrderButtonDisabled]}
         onPress={handleCheckout}
-        disabled={checkoutLoading}
+        disabled={checkoutLoading || !isFormValid()}
       >
         {checkoutLoading ? (
           <ActivityIndicator color="#fff" />
@@ -161,6 +331,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     marginTop: 10,
   },
+  // CHANGE: Add input container for error message spacing
+  inputContainer: {
+    marginBottom: 15,
+  },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -168,7 +342,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     fontSize: 16,
-    marginBottom: 15,
+  },
+  // CHANGE: Add error state styling
+  inputError: {
+    borderColor: '#ff3b30',
+    borderWidth: 2,
+  },
+  // CHANGE: Add error text styling
+  errorText: {
+    color: '#ff3b30',
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 5,
   },
   row: {
     flexDirection: 'row',
@@ -219,6 +404,11 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginBottom: 30,
+  },
+  // CHANGE: Add disabled button styling
+  placeOrderButtonDisabled: {
+    backgroundColor: '#B0D4FF',
+    opacity: 0.6,
   },
   placeOrderText: {
     color: '#fff',
