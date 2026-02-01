@@ -73,8 +73,9 @@ const ProductDetailScreen = ({ route, navigation }) => {
               [
                 {
                   text: 'OK',
-                  onPress: () => {
-                    AsyncStorage.clear();
+                  onPress: async () => {
+                    // CHANGE: Clear storage and reset navigation properly
+                    await AsyncStorage.clear();
                     navigation.reset({
                       index: 0,
                       routes: [{ name: 'Login' }],
@@ -97,11 +98,21 @@ const ProductDetailScreen = ({ route, navigation }) => {
             {
               text: 'Logout',
               onPress: async () => {
-                await AsyncStorage.clear();
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Login' }],
-                });
+                // CHANGE: Properly clear storage and reset navigation to login
+                try {
+                  await AsyncStorage.clear();
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                  });
+                } catch (clearError) {
+                  console.error('Error clearing storage:', clearError);
+                  // CHANGE: Force navigation even if storage clear fails
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                  });
+                }
               },
             },
           ]

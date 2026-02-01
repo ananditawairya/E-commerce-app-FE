@@ -42,7 +42,6 @@ const authLink = setContext(async (_, { headers }) => {
   }
 });
 
-// CHANGE: Add error link to capture and log GraphQL errors
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors) {
     graphQLErrors.forEach(({ message, locations, path }) => {
@@ -54,7 +53,6 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
 
   if (networkError) {
     console.error(`Network error: ${networkError}`);
-    // CHANGE: Log more details about network errors
     if (networkError.statusCode) {
       console.error(`Status Code: ${networkError.statusCode}`);
     }
@@ -65,16 +63,33 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
 });
 
 const client = new ApolloClient({
-  // CHANGE: Add error link to the chain
   link: errorLink.concat(authLink.concat(httpLink)),
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    // CHANGE: Configure cache policies for better real-time updates
+    typePolicies: {
+      Product: {
+        fields: {
+          variants: {
+            merge: false, // CHANGE: Replace variants array completely on updates
+          },
+        },
+      },
+      Variant: {
+        fields: {
+          stock: {
+            merge: false, // CHANGE: Replace stock value completely on updates
+          },
+        },
+      },
+    },
+  }),
   defaultOptions: {
     watchQuery: {
       fetchPolicy: 'cache-and-network',
       errorPolicy: 'all',
     },
     query: {
-      fetchPolicy: 'network-only',
+      fetchPolicy: 'network-only', // CHANGE: Always fetch fresh data for queries
       errorPolicy: 'all',
     },
     mutate: {

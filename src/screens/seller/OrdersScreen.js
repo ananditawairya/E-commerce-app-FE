@@ -9,8 +9,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_SELLER_ORDERS } from '../../graphql/queries';
-import { UPDATE_ORDER_STATUS } from '../../graphql/mutations';
+import { GET_SELLER_ORDERS, GET_SELLER_PRODUCTS } from '../../graphql/queries';
+import { UPDATE_ORDER_STATUS, CANCEL_ORDER } from '../../graphql/mutations';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const OrdersScreen = () => {
@@ -20,6 +20,20 @@ const OrdersScreen = () => {
     refetchQueries: [{ query: GET_SELLER_ORDERS }],
     onCompleted: () => {
       Alert.alert('Success', 'Order status updated');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  // CHANGE: Add GET_SELLER_PRODUCTS to refetchQueries to update stock display
+  const [cancelOrder] = useMutation(CANCEL_ORDER, {
+    refetchQueries: [
+      { query: GET_SELLER_ORDERS },
+      { query: GET_SELLER_PRODUCTS } // CHANGE: Refetch seller products to update stock
+    ],
+    onCompleted: () => {
+      Alert.alert('Success', 'Order cancelled successfully. Stock has been restored.');
     },
     onError: (error) => {
       Alert.alert('Error', error.message);
@@ -40,6 +54,28 @@ const OrdersScreen = () => {
     }
 
     updateOrderStatus({ variables: { orderId, status: nextStatus } });
+  };
+
+  const handleCancelOrder = (orderId, currentStatus) => {
+    if (currentStatus === 'cancelled' || currentStatus === 'delivered') {
+      Alert.alert('Info', 'This order cannot be cancelled');
+      return;
+    }
+
+    Alert.alert(
+      'Cancel Order',
+      'Are you sure you want to cancel this order? Stock will be restored automatically.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: () => {
+            cancelOrder({ variables: { orderId } });
+          },
+        },
+      ]
+    );
   };
 
   const renderOrder = ({ item }) => {
@@ -72,14 +108,25 @@ const OrdersScreen = () => {
           <Text style={styles.totalText}>
             Total: ${item.totalAmount.toFixed(2)}
           </Text>
-          {item.status !== 'delivered' && item.status !== 'cancelled' && (
-            <TouchableOpacity
-              style={styles.updateButton}
-              onPress={() => handleStatusChange(item.id, item.status)}
-            >
-              <Text style={styles.updateButtonText}>Update Status</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.actionButtons}>
+            {(item.status === 'pending' || item.status === 'confirmed') && (
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => handleCancelOrder(item.id, item.status)}
+              >
+                <MaterialIcons name="cancel" size={16} color="#fff" />
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
+            {item.status !== 'delivered' && item.status !== 'cancelled' && (
+              <TouchableOpacity
+                style={styles.updateButton}
+                onPress={() => handleStatusChange(item.id, item.status)}
+              >
+                <Text style={styles.updateButtonText}>Update Status</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     );
@@ -164,6 +211,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#c3e6cb',
     color: '#155724',
   },
+  status_cancelled: {
+    backgroundColor: '#f8d7da',
+    color: '#721c24',
+  },
   orderDate: {
     fontSize: 12,
     color: '#666',
@@ -204,6 +255,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#007AFF',
   },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   updateButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 12,
@@ -211,6 +266,20 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   updateButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: '#ff3b30',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cancelButtonText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',

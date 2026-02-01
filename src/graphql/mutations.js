@@ -199,3 +199,18 @@ export const UPDATE_ORDER_STATUS = gql`
     }
   }
 `;
+
+// CHANGE: Add cancel order mutation
+export const CANCEL_ORDER = gql`
+  mutation CancelOrder($orderId: ID!) {
+    cancelOrder(orderId: $orderId) {
+      id
+      orderId
+      buyerId
+      totalAmount
+      status
+      createdAt
+      updatedAt
+    }
+  }
+`;
