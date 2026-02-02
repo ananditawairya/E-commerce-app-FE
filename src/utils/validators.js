@@ -26,11 +26,11 @@ export const validateEmail = (email) => {
  */
 export const validatePassword = (password, options = {}) => {
   const {
-    minLength = 6,
-    requireUppercase = false,
-    requireLowercase = false,
-    requireNumber = false,
-    requireSpecialChar = false,
+    minLength = 8,
+    requireUppercase = true,
+    requireLowercase = true,
+    requireNumber = true,
+    requireSpecialChar = true,
   } = options;
 
   if (!password || password.length === 0) {
