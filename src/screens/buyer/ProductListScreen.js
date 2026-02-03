@@ -11,17 +11,43 @@ import {
   Alert,
 } from 'react-native';
 import { useQuery } from '@apollo/client';
-import { GET_PRODUCTS, GET_CATEGORIES } from '../../graphql/queries';
+import {
+  GET_PRODUCTS,
+  GET_CATEGORIES,
+  GET_RECOMMENDATIONS,
+  GET_TRENDING_PRODUCTS
+} from '../../graphql/queries';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import ProductHorizontalList from '../../components/ProductHorizontalList';
+import ProductCard from '../../components/ProductCard';
+import ChatBot from '../../components/ChatBot';
 
 // CHANGE: Accept onLogout prop from parent component
 const ProductListScreen = ({ navigation, onLogout }) => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [userId, setUserId] = useState(null);
+
+  React.useEffect(() => {
+    const getUserId = async () => {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      setUserId(storedUserId);
+    };
+    getUserId();
+  }, []);
 
   const { data, loading, refetch } = useQuery(GET_PRODUCTS, {
-    variables: { search, category: selectedCategory || null, limit: 20 },
+    variables: { search, category: selectedCategory || null, limit: 100 },
+  });
+
+  const { data: recData, loading: recLoading } = useQuery(GET_RECOMMENDATIONS, {
+    variables: { userId, limit: 10 },
+    skip: !userId,
+  });
+
+  const { data: trendingData, loading: trendingLoading } = useQuery(GET_TRENDING_PRODUCTS, {
+    variables: { limit: 10 },
   });
 
   const { data: categoriesData } = useQuery(GET_CATEGORIES);
@@ -51,24 +77,26 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     );
   };
 
+  const getEnrichedProducts = (recommendations) => {
+    if (!recommendations || !data?.products) return [];
+    return recommendations.map(rec => {
+      const product = data.products.find(p => p.id === rec.productId);
+      if (product) {
+        return { ...product, ...rec };
+      }
+      return null;
+    }).filter(p => p !== null);
+  };
+
+  const recommendedProducts = getEnrichedProducts(recData?.getRecommendations);
+  const trendingProducts = getEnrichedProducts(trendingData?.getTrendingProducts);
+
   const renderProduct = ({ item }) => (
-    <TouchableOpacity
-      style={styles.productCard}
-      onPress={() => navigation.navigate('ProductDetail', { product: item })}
-    >
-      {item.images && item.images.length > 0 ? (
-        <Image source={{ uri: item.images[0] }} style={styles.productImage} />
-      ) : (
-        <View style={styles.placeholderImage}>
-          <MaterialIcons name="image" size={50} color="#ccc" />
-        </View>
-      )}
-      <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.productCategory}>{item.category}</Text>
-        <Text style={styles.productPrice}>${item.basePrice.toFixed(2)}</Text>
-      </View>
-    </TouchableOpacity>
+    <ProductCard
+      product={item}
+      onPress={(p) => navigation.navigate('ProductDetail', { product: p })}
+      style={styles.mainProductCard}
+    />
   );
 
   const renderCategory = ({ item }) => (
@@ -90,68 +118,100 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     </TouchableOpacity>
   );
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Products</Text>
-        <TouchableOpacity 
-          onPress={handleLogout}
-          accessibilityLabel="Logout"
-          accessibilityHint="Logout from the application"
-        >
-          <MaterialIcons name="logout" size={24} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <MaterialIcons name="search" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search products..."
-          value={search}
-          onChangeText={setSearch}
+  const renderHeader = () => (
+    <View>
+      {recommendedProducts.length > 0 && !search && (
+        <ProductHorizontalList
+          title="Recommended for You"
+          products={recommendedProducts}
+          onProductPress={(p) => navigation.navigate('ProductDetail', { product: p })}
+          loading={recLoading}
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <MaterialIcons name="close" size={20} color="#666" />
+      )}
+
+      {trendingProducts.length > 0 && !search && (
+        <ProductHorizontalList
+          title="Trending Now"
+          products={trendingProducts}
+          onProductPress={(p) => navigation.navigate('ProductDetail', { product: p })}
+          loading={trendingLoading}
+        />
+      )}
+
+      <Text style={styles.sectionTitle}>
+        {search ? `Search results for "${search}"` : 'All Products'}
+      </Text>
+    </View>
+  );
+
+  return (
+    <>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Products</Text>
+          <TouchableOpacity
+            onPress={handleLogout}
+            accessibilityLabel="Logout"
+            accessibilityHint="Logout from the application"
+          >
+            <MaterialIcons name="logout" size={24} color="#007AFF" />
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchContainer}>
+          <MaterialIcons name="search" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search products..."
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <MaterialIcons name="close" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {categoriesData && categoriesData.categories.length > 0 && (
+          <FlatList
+            data={categoriesData.categories}
+            renderItem={renderCategory}
+            keyExtractor={(item) => item}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoriesList}
+            contentContainerStyle={styles.categoriesContent}
+          />
+        )}
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+          </View>
+        ) : (
+          <FlatList
+            data={data?.products || []}
+            renderItem={renderProduct}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            contentContainerStyle={styles.productsGrid}
+            onRefresh={refetch}
+            refreshing={loading}
+            ListHeaderComponent={renderHeader}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <MaterialIcons name="shopping-bag" size={60} color="#ccc" />
+                <Text style={styles.emptyText}>No products found</Text>
+              </View>
+            }
+          />
         )}
       </View>
 
-      {categoriesData && categoriesData.categories.length > 0 && (
-        <FlatList
-          data={categoriesData.categories}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesList}
-          contentContainerStyle={styles.categoriesContent}
-        />
-      )}
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-        </View>
-      ) : (
-        <FlatList
-          data={data?.products || []}
-          renderItem={renderProduct}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          contentContainerStyle={styles.productsGrid}
-          onRefresh={refetch}
-          refreshing={loading}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <MaterialIcons name="shopping-bag" size={60} color="#ccc" />
-              <Text style={styles.emptyText}>No products found</Text>
-            </View>
-          }
-        />
-      )}
-    </View>
+      {/* AI Shopping Assistant */}
+      <ChatBot navigation={navigation} />
+    </>
   );
 };
 
@@ -193,20 +253,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   categoriesList: {
-    maxHeight: 50,
-    marginBottom: 10,
+    maxHeight: 60,
+    marginBottom: 5,
   },
   categoriesContent: {
     paddingHorizontal: 15,
   },
   categoryChip: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     backgroundColor: '#fff',
     borderRadius: 20,
     marginRight: 10,
     borderWidth: 1,
     borderColor: '#ddd',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 40,
   },
   categoryChipActive: {
     backgroundColor: '#007AFF',
@@ -261,6 +324,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#007AFF',
+  },
+  mainProductCard: {
+    flex: 1,
+    margin: 5,
+    maxWidth: '48%',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    paddingHorizontal: 15,
+    marginTop: 10,
+    marginBottom: 5,
   },
   loadingContainer: {
     flex: 1,

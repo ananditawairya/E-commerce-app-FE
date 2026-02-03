@@ -9,17 +9,51 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ADD_TO_CART } from '../../graphql/mutations';
-import { GET_MY_CART } from '../../graphql/queries';
+import { ADD_TO_CART, TRACK_EVENT } from '../../graphql/mutations';
+import { GET_MY_CART, GET_SIMILAR_PRODUCTS, GET_PRODUCTS } from '../../graphql/queries';
 import { MaterialIcons } from '@expo/vector-icons';
+import ProductHorizontalList from '../../components/ProductHorizontalList';
 
 const ProductDetailScreen = ({ route, navigation }) => {
   const { product } = route.params;
-  const [selectedVariant, setSelectedVariant] = useState(product.variants[0] || null);
+  const [selectedVariant, setSelectedVariant] = useState(
+    product.variants && product.variants.length > 0 ? product.variants[0] : null
+  );
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [userId, setUserId] = useState(null);
+
+  // CHANGE: Fetch all products to enrich similar products (simplified logic for now)
+  const { data: allProductsData } = useQuery(GET_PRODUCTS, {
+    variables: { limit: 100 },
+  });
+
+  const { data: similarData, loading: similarLoading } = useQuery(GET_SIMILAR_PRODUCTS, {
+    variables: { productId: product.id, limit: 10 },
+  });
+
+  const [trackEvent] = useMutation(TRACK_EVENT);
+
+  React.useEffect(() => {
+    const init = async () => {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      setUserId(storedUserId);
+
+      if (storedUserId) {
+        trackEvent({
+          variables: {
+            userId: storedUserId,
+            productId: product.id,
+            eventType: 'view',
+            category: product.category,
+          }
+        }).catch(err => console.error('Tracking error:', err));
+      }
+    };
+    init();
+  }, [product.id]);
 
   // CHANGE: Set navigation header options with back button
   React.useLayoutEffect(() => {
@@ -54,18 +88,18 @@ const ProductDetailScreen = ({ route, navigation }) => {
     },
     onError: async (error) => {
       console.error('Add to cart error:', error);
-      
+
       if (error.message.includes('Authentication failed') || error.message.includes('Unauthorized')) {
         try {
           const token = await AsyncStorage.getItem('accessToken');
           const userId = await AsyncStorage.getItem('userId');
-          
+
           console.log('Auth error - Token check:', {
             hasToken: !!token,
             hasUserId: !!userId,
             tokenLength: token?.length || 0
           });
-          
+
           if (!token || !userId) {
             Alert.alert(
               'Session Expired',
@@ -89,7 +123,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
         } catch (storageError) {
           console.error('Storage check error:', storageError);
         }
-        
+
         Alert.alert(
           'Authentication Error',
           'There was a problem with your session. Please try logging out and back in.',
@@ -140,7 +174,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       const userId = await AsyncStorage.getItem('userId');
-      
+
       if (!token || !userId) {
         Alert.alert(
           'Please Log In',
@@ -159,7 +193,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
         );
         return;
       }
-      
+
       console.log('Add to cart - Auth check passed:', {
         hasToken: !!token,
         hasUserId: !!userId
@@ -181,7 +215,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
     }
 
     const price = calculatePrice();
-    
+
     const variables = {
       productId: String(product.id),
       productName: product.name,
@@ -194,6 +228,19 @@ const ProductDetailScreen = ({ route, navigation }) => {
     console.log('Adding to cart with variables:', variables);
 
     addToCart({ variables });
+
+    // Track add_to_cart event
+    if (userId) {
+      trackEvent({
+        variables: {
+          userId,
+          productId: product.id,
+          eventType: 'add_to_cart',
+          category: product.category,
+          metadata: JSON.stringify({ variantId: selectedVariant?.id, quantity })
+        }
+      }).catch(err => console.error('Tracking error (add_to_cart):', err));
+    }
   };
 
   return (
@@ -322,6 +369,19 @@ const ProductDetailScreen = ({ route, navigation }) => {
               <Text style={styles.addToCartText}>Add to Cart</Text>
             )}
           </TouchableOpacity>
+        )}
+
+        {/* Similar Products Section */}
+        {similarData?.getSimilarProducts && (
+          <ProductHorizontalList
+            title="Similar Products"
+            products={similarData.getSimilarProducts.map(rec => {
+              const enriched = allProductsData?.products?.find(p => p.id === rec.productId);
+              return enriched ? { ...enriched, ...rec } : null;
+            }).filter(p => p !== null)}
+            onProductPress={(p) => navigation.push('ProductDetail', { product: p })}
+            loading={similarLoading}
+          />
         )}
       </View>
     </ScrollView>

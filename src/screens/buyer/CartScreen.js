@@ -10,10 +10,21 @@ import {
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_MY_CART } from '../../graphql/queries';
-import { UPDATE_CART_ITEM, REMOVE_FROM_CART } from '../../graphql/mutations';
+import { UPDATE_CART_ITEM, REMOVE_FROM_CART, TRACK_EVENT } from '../../graphql/mutations';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CartScreen = ({ navigation }) => {
+  const [userId, setUserId] = React.useState(null);
+
+  React.useEffect(() => {
+    const getUserId = async () => {
+      const id = await AsyncStorage.getItem('userId');
+      setUserId(id);
+    };
+    getUserId();
+  }, []);
+
   const { data, loading, refetch } = useQuery(GET_MY_CART);
 
   const [updateCartItem] = useMutation(UPDATE_CART_ITEM, {
@@ -23,6 +34,8 @@ const CartScreen = ({ navigation }) => {
   const [removeFromCart] = useMutation(REMOVE_FROM_CART, {
     refetchQueries: [{ query: GET_MY_CART }],
   });
+
+  const [trackEvent] = useMutation(TRACK_EVENT);
 
   const handleUpdateQuantity = (productId, variantId, newQuantity) => {
     if (newQuantity === 0) {
@@ -43,6 +56,18 @@ const CartScreen = ({ navigation }) => {
         style: 'destructive',
         onPress: () => {
           removeFromCart({ variables: { productId, variantId } });
+
+          // Track remove_from_cart event
+          if (userId) {
+            trackEvent({
+              variables: {
+                userId,
+                productId,
+                eventType: 'remove_from_cart',
+                metadata: JSON.stringify({ variantId })
+              }
+            }).catch(err => console.error('Tracking error (remove_from_cart):', err));
+          }
         },
       },
     ]);

@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_MY_CART } from '../../graphql/queries';
-import { CHECKOUT } from '../../graphql/mutations';
+import { CHECKOUT, TRACK_EVENT } from '../../graphql/mutations';
 // CHANGE: Import MaterialIcons for back button icon
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   validateStreet,
   validateCity,
@@ -28,6 +29,15 @@ const CheckoutScreen = ({ navigation }) => {
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [country, setCountry] = useState('');
+  const [userId, setUserId] = useState(null);
+
+  React.useEffect(() => {
+    const getUserId = async () => {
+      const id = await AsyncStorage.getItem('userId');
+      setUserId(id);
+    };
+    getUserId();
+  }, []);
 
   // CHANGE: Add validation error states
   const [streetError, setStreetError] = useState('');
@@ -45,30 +55,47 @@ const CheckoutScreen = ({ navigation }) => {
 
   const { data, loading: cartLoading } = useQuery(GET_MY_CART);
 
- const [checkout, { loading: checkoutLoading }] = useMutation(CHECKOUT, {
-  onCompleted: (data) => {
-    // CHANGE: Handle single order response (backend returns first order for compatibility)
-    const order = data.checkout;
-    Alert.alert(
-      'Success', 
-      `Order placed successfully! Order ID: ${order.orderId}`,
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'BuyerHome' }],
-            });
+  const [trackEvent] = useMutation(TRACK_EVENT);
+
+  const [checkout, { loading: checkoutLoading }] = useMutation(CHECKOUT, {
+    onCompleted: (data) => {
+      // CHANGE: Handle single order response (backend returns first order for compatibility)
+      const order = data.checkout;
+
+      // Track purchase events for each item in the cart
+      if (userId && data?.myCart?.items) {
+        data.myCart.items.forEach(item => {
+          trackEvent({
+            variables: {
+              userId,
+              productId: item.productId,
+              eventType: 'purchase',
+              metadata: JSON.stringify({ variantId: item.variantId, orderId: order.orderId })
+            }
+          }).catch(err => console.error('Tracking error (purchase):', err));
+        });
+      }
+
+      Alert.alert(
+        'Success',
+        `Order placed successfully! Order ID: ${order.orderId}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'BuyerHome' }],
+              });
+            },
           },
-        },
-      ]
-    );
-  },
-  onError: (error) => {
-    Alert.alert('Error', error.message);
-  },
-});
+        ]
+      );
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
 
   // CHANGE: Configure navigation header with back button
   React.useLayoutEffect(() => {

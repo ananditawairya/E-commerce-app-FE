@@ -216,3 +216,56 @@ export const CANCEL_ORDER = gql`
     }
   }
 `;
+
+export const TRACK_EVENT = gql`
+  mutation TrackEvent(
+    $userId: ID!
+    $productId: ID!
+    $eventType: String!
+    $category: String
+    $metadata: String
+  ) {
+    trackEvent(
+      userId: $userId
+      productId: $productId
+      eventType: $eventType
+      category: $category
+      metadata: $metadata
+    ) {
+      success
+      message
+    }
+  }
+`;
+
+// AI Shopping Assistant - Send chat message
+export const SEND_CHAT_MESSAGE = gql`
+  mutation SendChatMessage(
+    $userId: ID!
+    $message: String!
+    $conversationId: String
+  ) {
+    sendChatMessage(
+      userId: $userId
+      message: $message
+      conversationId: $conversationId
+    ) {
+      message
+      products {
+        id
+        name
+        description
+        category
+        basePrice
+        images
+        variants {
+          id
+          name
+          priceModifier
+          stock
+        }
+      }
+      conversationId
+    }
+  }
+`;

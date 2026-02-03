@@ -210,3 +210,47 @@ export const GET_ORDER = gql`
     }
   }
 `;
+
+export const GET_RECOMMENDATIONS = gql`
+  query GetRecommendations($userId: ID!, $limit: Int) {
+    getRecommendations(userId: $userId, limit: $limit) {
+      productId
+      score
+      reason
+      category
+    }
+  }
+`;
+
+export const GET_SIMILAR_PRODUCTS = gql`
+  query GetSimilarProducts($productId: ID!, $limit: Int) {
+    getSimilarProducts(productId: $productId, limit: $limit) {
+      productId
+      score
+      reason
+      category
+    }
+  }
+`;
+
+export const GET_TRENDING_PRODUCTS = gql`
+  query GetTrendingProducts($category: String, $limit: Int) {
+    getTrendingProducts(category: $category, limit: $limit) {
+      productId
+      score
+      reason
+      category
+    }
+  }
+`;
+
+export const GET_RECENTLY_VIEWED = gql`
+  query GetRecentlyViewed($userId: ID!, $limit: Int) {
+    getRecentlyViewed(userId: $userId, limit: $limit) {
+      productId
+      score
+      reason
+      category
+    }
+  }
+`;
