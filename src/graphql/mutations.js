@@ -31,14 +31,16 @@ export const LOGIN = gql`
 `;
 
 export const ADD_TO_CART = gql`
-  mutation AddToCart($productId: String!, $variantId: String, $quantity: Int!, $price: Float!) {
-    addToCart(productId: $productId, variantId: $variantId, quantity: $quantity, price: $price) {
+  mutation AddToCart($productId: String!, $productName: String!, $variantId: String, $variantName: String, $quantity: Int!, $price: Float!){
+    addToCart(productId: $productId, productName: $productName, variantId: $variantId, variantName: $variantName, quantity: $quantity, price: $price) {
       id,
       userId
       items {
         id
         productId
+        productName
         variantId
+        variantName
         quantity
         price
       }

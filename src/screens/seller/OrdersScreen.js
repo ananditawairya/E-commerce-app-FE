@@ -32,6 +32,7 @@ const OrdersScreen = () => {
       { query: GET_SELLER_ORDERS },
       { query: GET_SELLER_PRODUCTS } // CHANGE: Refetch seller products to update stock
     ],
+    awaitRefetchQueries: true,
     onCompleted: () => {
       Alert.alert('Success', 'Order cancelled successfully. Stock has been restored.');
     },

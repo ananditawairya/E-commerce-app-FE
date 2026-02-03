@@ -184,7 +184,9 @@ const ProductDetailScreen = ({ route, navigation }) => {
     
     const variables = {
       productId: String(product.id),
+      productName: product.name,
       variantId: selectedVariant?.id ? String(selectedVariant.id) : null,
+      variantName: selectedVariant?.name || null,
       quantity: parseInt(quantity, 10),
       price: parseFloat(price.toFixed(2)),
     };

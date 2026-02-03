@@ -76,7 +76,9 @@ export const GET_MY_CART = gql`
       items {
         id
         productId
+        productName
         variantId
+        variantName
         quantity
         price
       }

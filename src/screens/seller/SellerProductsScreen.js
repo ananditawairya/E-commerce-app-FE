@@ -16,7 +16,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 // CHANGE: Accept onLogout prop from parent component
 const SellerProductsScreen = ({ navigation, onLogout }) => {
-  const { data, loading, refetch } = useQuery(GET_SELLER_PRODUCTS);
+  const { data, loading, refetch } = useQuery(GET_SELLER_PRODUCTS, {
+  // CHANGE: Always fetch fresh data from network
+  fetchPolicy: 'network-only',
+  // CHANGE: Poll every 5 seconds to catch stock updates from order cancellations
+  pollInterval: 5000,
+});
 
   const [deleteProduct] = useMutation(DELETE_PRODUCT, {
     refetchQueries: [{ query: GET_SELLER_PRODUCTS }],

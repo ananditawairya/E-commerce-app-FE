@@ -12,6 +12,8 @@ import {
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_MY_CART } from '../../graphql/queries';
 import { CHECKOUT } from '../../graphql/mutations';
+// CHANGE: Import MaterialIcons for back button icon
+import { MaterialIcons } from '@expo/vector-icons';
 import {
   validateStreet,
   validateCity,
@@ -43,9 +45,14 @@ const CheckoutScreen = ({ navigation }) => {
 
   const { data, loading: cartLoading } = useQuery(GET_MY_CART);
 
-  const [checkout, { loading: checkoutLoading }] = useMutation(CHECKOUT, {
-    onCompleted: () => {
-      Alert.alert('Success', 'Order placed successfully!', [
+ const [checkout, { loading: checkoutLoading }] = useMutation(CHECKOUT, {
+  onCompleted: (data) => {
+    // CHANGE: Handle single order response (backend returns first order for compatibility)
+    const order = data.checkout;
+    Alert.alert(
+      'Success', 
+      `Order placed successfully! Order ID: ${order.orderId}`,
+      [
         {
           text: 'OK',
           onPress: () => {
@@ -55,12 +62,39 @@ const CheckoutScreen = ({ navigation }) => {
             });
           },
         },
-      ]);
-    },
-    onError: (error) => {
-      Alert.alert('Error', error.message);
-    },
-  });
+      ]
+    );
+  },
+  onError: (error) => {
+    Alert.alert('Error', error.message);
+  },
+});
+
+  // CHANGE: Configure navigation header with back button
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      title: 'Checkout',
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerBackButton}
+          accessibilityLabel="Go back to cart"
+          accessibilityHint="Navigate back to shopping cart"
+        >
+          <MaterialIcons name="arrow-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+      ),
+      headerStyle: {
+        backgroundColor: '#fff',
+      },
+      headerTitleStyle: {
+        color: '#333',
+        fontSize: 18,
+        fontWeight: '600',
+      },
+    });
+  }, [navigation]);
 
   // CHANGE: Real-time validation handlers
   const handleStreetChange = (text) => {
@@ -323,6 +357,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // CHANGE: Add header back button styling
+  headerBackButton: {
+    marginLeft: 15,
+    padding: 5,
   },
   sectionTitle: {
     fontSize: 20,

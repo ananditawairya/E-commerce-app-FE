@@ -80,21 +80,49 @@ const AppNavigator = () => {
     checkAuth();
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      const role = await AsyncStorage.getItem('userRole');
-      
-      if (token && role) {
+ const checkAuth = async () => {
+  try {
+    const token = await AsyncStorage.getItem('accessToken');
+    const role = await AsyncStorage.getItem('userRole');
+    
+    if (token && role) {
+      // CHANGE: Validate token before setting authenticated state
+      try {
+        const response = await fetch('http://localhost:4000/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            query: `query { me(token: "${token}") { id } }`,
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (result.errors || !result.data?.me) {
+          // CHANGE: Token invalid - clear storage and stay logged out
+          await AsyncStorage.clear();
+          console.log('⚠️ Invalid token cleared on startup');
+          return;
+        }
+        
+        // CHANGE: Token valid - proceed with authenticated state
         setIsAuthenticated(true);
         setUserRole(role);
+      } catch (validationError) {
+        // CHANGE: Validation failed - clear storage
+        console.log('Token validation error:', validationError);
+        await AsyncStorage.clear();
       }
-    } catch (error) {
-      console.log('Auth check error:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.log('Auth check error:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // CHANGE: Add authentication success handler to update state
   const handleAuthSuccess = async () => {
@@ -117,8 +145,13 @@ const AppNavigator = () => {
       await AsyncStorage.clear();
       setIsAuthenticated(false);
       setUserRole(null);
+      // CHANGE: Don't use navigation.reset here - let state change trigger re-render
+      console.log('✅ Logout successful - state cleared');
     } catch (error) {
       console.log('Logout error:', error);
+      // CHANGE: Force state reset even if storage clear fails
+      setIsAuthenticated(false);
+      setUserRole(null);
     }
   };
 
@@ -157,7 +190,9 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="Checkout" 
               component={CheckoutScreen}
-              options={{ title: 'Checkout' }}
+              options={{ 
+                headerShown: false,
+              }}
             />
           </>
         ) : (

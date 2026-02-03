@@ -51,9 +51,9 @@ const CartScreen = ({ navigation }) => {
   const renderCartItem = ({ item }) => (
     <View style={styles.cartItem}>
       <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>Product ID: {item.productId}</Text>
+        <Text style={styles.itemName}>{item.productName}</Text>
         {item.variantId && (
-          <Text style={styles.itemVariant}>Variant: {item.variantId}</Text>
+          <Text style={styles.itemVariant}>Variant: {item.variantName}</Text>
         )}
         <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
       </View>
