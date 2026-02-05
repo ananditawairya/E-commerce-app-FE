@@ -66,16 +66,16 @@ const ProductDetailScreen = ({ route, navigation }) => {
           style={styles.headerBackButton}
           accessibilityLabel="Go back to products"
         >
-          <MaterialIcons name="arrow-back" size={24} color="#007AFF" />
+          <MaterialIcons name="arrow-back" size={24} color="#2563EB" />
         </TouchableOpacity>
       ),
       headerStyle: {
-        backgroundColor: '#fff',
+        backgroundColor: '#F7F7F8',
       },
       headerTitleStyle: {
-        color: '#333',
+        color: '#111827',
         fontSize: 18,
-        fontWeight: '600',
+        fontWeight: '700',
       },
     });
   }, [navigation]);
@@ -338,14 +338,14 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 style={styles.quantityButton}
                 onPress={() => setQuantity(Math.max(1, quantity - 1))}
               >
-                <MaterialIcons name="remove" size={20} color="#007AFF" />
+                <MaterialIcons name="remove" size={20} color="#2563EB" />
               </TouchableOpacity>
               <Text style={styles.quantityText}>{quantity}</Text>
               <TouchableOpacity
                 style={styles.quantityButton}
                 onPress={() => setQuantity(quantity + 1)}
               >
-                <MaterialIcons name="add" size={20} color="#007AFF" />
+                <MaterialIcons name="add" size={20} color="#2563EB" />
               </TouchableOpacity>
             </View>
           </View>
@@ -391,81 +391,100 @@ const ProductDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F7F7F8',
+  },
+  headerBackButton: {
+    marginLeft: 12,
+    padding: 6,
+    borderRadius: 12,
     backgroundColor: '#fff',
   },
   mainImage: {
     width: '100%',
-    height: 300,
+    height: 320,
     resizeMode: 'cover',
+    borderRadius: 18,
+    marginTop: 12,
+    marginHorizontal: 16,
   },
   placeholderImage: {
     width: '100%',
-    height: 300,
-    backgroundColor: '#f0f0f0',
+    height: 320,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 18,
+    marginTop: 12,
+    marginHorizontal: 16,
   },
   imageIndicators: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   indicator: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ddd',
+    backgroundColor: '#D1D5DB',
     marginHorizontal: 4,
   },
   indicatorActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2563EB',
   },
   content: {
-    padding: 20,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E6E8EB',
   },
   productName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 5,
   },
   category: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
     marginBottom: 10,
   },
   price: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontWeight: '700',
+    color: '#2563EB',
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
     marginTop: 15,
     marginBottom: 10,
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
     lineHeight: 20,
   },
   variantCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 8,
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E6E8EB',
     marginBottom: 10,
     backgroundColor: '#fff',
   },
   variantCardActive: {
-    borderColor: '#007AFF',
-    backgroundColor: '#f0f8ff',
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
   },
   // CHANGE: Add styling for out of stock variants
   variantCardOutOfStock: {
@@ -479,7 +498,7 @@ const styles = StyleSheet.create({
   variantName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: '#111827',
     marginBottom: 4,
   },
   // CHANGE: Add styling for out of stock variant name
@@ -489,17 +508,17 @@ const styles = StyleSheet.create({
   },
   variantStock: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
   },
   // CHANGE: Add styling for out of stock text
   outOfStockText: {
-    color: '#ff3b30',
+    color: '#EF4444',
     fontWeight: '600',
   },
   variantPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#2563EB',
   },
   // CHANGE: Add styling for out of stock variant price
   variantPriceOutOfStock: {
@@ -518,14 +537,15 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#EFF6FF',
   },
   quantityText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
     minWidth: 30,
     textAlign: 'center',
   },
@@ -534,28 +554,28 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
     padding: 30,
-    backgroundColor: '#fff5f5',
-    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#ffcccc',
+    borderColor: '#FECACA',
     alignItems: 'center',
   },
   outOfStockMessage: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#ff3b30',
+    color: '#EF4444',
     marginTop: 15,
     textAlign: 'center',
   },
   outOfStockSubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#9CA3AF',
     marginTop: 8,
     textAlign: 'center',
   },
   addToCartButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
     padding: 16,
     alignItems: 'center',
     marginTop: 30,
@@ -568,8 +588,8 @@ const styles = StyleSheet.create({
   },
   // CHANGE: Add out of stock button styling
   outOfStockButton: {
-    backgroundColor: '#ff3b30',
-    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    borderRadius: 14,
     padding: 16,
     alignItems: 'center',
     marginTop: 30,

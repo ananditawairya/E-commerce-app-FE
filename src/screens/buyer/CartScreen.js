@@ -90,7 +90,7 @@ const CartScreen = ({ navigation }) => {
             handleUpdateQuantity(item.productId, item.variantId, item.quantity - 1)
           }
         >
-          <MaterialIcons name="remove" size={18} color="#007AFF" />
+          <MaterialIcons name="remove" size={18} color="#2563EB" />
         </TouchableOpacity>
         <Text style={styles.quantityText}>{item.quantity}</Text>
         <TouchableOpacity
@@ -99,7 +99,7 @@ const CartScreen = ({ navigation }) => {
             handleUpdateQuantity(item.productId, item.variantId, item.quantity + 1)
           }
         >
-          <MaterialIcons name="add" size={18} color="#007AFF" />
+          <MaterialIcons name="add" size={18} color="#2563EB" />
         </TouchableOpacity>
       </View>
 
@@ -115,7 +115,7 @@ const CartScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
   }
@@ -168,7 +168,7 @@ const CartScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F7F7F8',
   },
   loadingContainer: {
     flex: 1,
@@ -183,15 +183,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: '#999',
+    color: '#9CA3AF',
     marginTop: 20,
     marginBottom: 30,
   },
   shopButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2563EB',
     paddingHorizontal: 30,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 14,
   },
   shopButtonText: {
     color: '#fff',
@@ -199,15 +199,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   list: {
-    padding: 15,
+    padding: 16,
   },
   cartItem: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E6E8EB',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   itemInfo: {
     flex: 1,
@@ -215,18 +222,18 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
     marginBottom: 4,
   },
   itemVariant: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     marginBottom: 4,
   },
   itemPrice: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#2563EB',
   },
   quantityControls: {
     flexDirection: 'row',
@@ -238,9 +245,10 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#EFF6FF',
   },
   quantityText: {
     fontSize: 14,
@@ -254,9 +262,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     backgroundColor: '#fff',
-    padding: 20,
+    padding: 18,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#E6E8EB',
   },
   totalContainer: {
     flexDirection: 'row',
@@ -266,16 +274,16 @@ const styles = StyleSheet.create({
   totalLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
   },
   totalAmount: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#2563EB',
   },
   checkoutButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
     padding: 16,
     alignItems: 'center',
   },

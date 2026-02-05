@@ -180,6 +180,25 @@ export const GET_SELLER_ORDERS = gql`
   }
 `;
 
+export const GET_SELLER_ANALYTICS = gql`
+  query GetSellerAnalytics($days: Int) {
+    sellerAnalytics(days: $days) {
+      totalRevenue
+      totalOrders
+      averageOrderValue
+      ordersByStatus {
+        status
+        count
+      }
+      trend {
+        date
+        revenue
+        orders
+      }
+    }
+  }
+`;
+
 export const GET_ORDER = gql`
   query GetOrder($id: ID!) {
     order(id: $id) {

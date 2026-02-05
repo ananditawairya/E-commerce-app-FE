@@ -162,7 +162,7 @@ const OrdersScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F7F7F8',
   },
   loadingContainer: {
     flex: 1,
@@ -170,13 +170,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: {
-    padding: 15,
+    padding: 16,
   },
   orderCard: {
     backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E6E8EB',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -187,14 +194,14 @@ const styles = StyleSheet.create({
   orderId: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
   },
   status: {
     fontSize: 12,
     fontWeight: 'bold',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 10,
   },
   status_pending: {
     backgroundColor: '#fff3cd',
@@ -218,28 +225,28 @@ const styles = StyleSheet.create({
   },
   orderDate: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     marginBottom: 10,
   },
   orderItem: {
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#E6E8EB',
     paddingTop: 10,
     marginTop: 10,
   },
   itemName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: '#111827',
   },
   itemVariant: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     marginTop: 2,
   },
   itemQuantity: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     marginTop: 2,
   },
   orderFooter: {
@@ -248,23 +255,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#E6E8EB',
     paddingTop: 10,
   },
   totalText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#2563EB',
   },
   actionButtons: {
     flexDirection: 'row',
     gap: 8,
   },
   updateButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2563EB',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 10,
   },
   updateButtonText: {
     color: '#fff',
@@ -272,10 +279,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cancelButton: {
-    backgroundColor: '#ff3b30',
+    backgroundColor: '#EF4444',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -293,7 +300,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: '#9CA3AF',
     marginTop: 10,
   },
 });

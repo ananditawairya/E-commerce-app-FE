@@ -19,6 +19,7 @@ import CheckoutScreen from '../screens/buyer/CheckoutScreen';
 import SellerProductsScreen from '../screens/seller/SellerProductsScreen';
 import AddProductScreen from '../screens/seller/AddProductScreen';
 import OrdersScreen from '../screens/seller/OrdersScreen';
+import AnalyticsScreen from '../screens/seller/AnalyticsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -34,8 +35,19 @@ const BuyerTabs = ({ onLogout }) => {
           else if (route.name === 'Cart') iconName = 'shopping-cart';
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#2563EB',
+        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: '#E6E8EB',
+          borderTopWidth: 1,
+          height: 58,
+          paddingBottom: 6,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
       })}
     >
       <Tab.Screen name="Products">
@@ -56,16 +68,29 @@ const SellerTabs = ({ onLogout }) => {
           let iconName;
           if (route.name === 'MyProducts') iconName = 'inventory';
           else if (route.name === 'Orders') iconName = 'list-alt';
+          else if (route.name === 'Analytics') iconName = 'insights';
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#2563EB',
+        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: '#E6E8EB',
+          borderTopWidth: 1,
+          height: 58,
+          paddingBottom: 6,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
       })}
     >
       <Tab.Screen name="MyProducts">
         {/* CHANGE: Pass onLogout callback to SellerProductsScreen */}
         {(props) => <SellerProductsScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
+      <Tab.Screen name="Analytics" component={AnalyticsScreen} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
     </Tab.Navigator>
   );

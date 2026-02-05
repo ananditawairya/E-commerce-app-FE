@@ -13,7 +13,7 @@ const ProductHorizontalList = ({ title, products, onProductPress, loading }) => 
         return (
             <View style={styles.loadingContainer}>
                 <Text style={styles.title}>{title}</Text>
-                <ActivityIndicator size="small" color="#007AFF" style={{ marginTop: 10 }} />
+                <ActivityIndicator size="small" color="#2563EB" style={{ marginTop: 10 }} />
             </View>
         );
     }
@@ -47,25 +47,27 @@ const ProductHorizontalList = ({ title, products, onProductPress, loading }) => 
 
 const styles = StyleSheet.create({
     container: {
-        marginVertical: 15,
+        marginVertical: 18,
     },
     loadingContainer: {
-        marginVertical: 15,
-        paddingHorizontal: 15,
+        marginVertical: 18,
+        paddingHorizontal: 20,
     },
     title: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        paddingHorizontal: 15,
-        marginBottom: 10,
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#111827',
+        paddingHorizontal: 20,
+        marginBottom: 12,
+        letterSpacing: -0.5,
     },
     listContent: {
-        paddingHorizontal: 10,
+        paddingHorizontal: 14,
+        paddingBottom: 10, // Added padding for shadows
     },
     card: {
-        width: 160,
-        marginHorizontal: 5,
+        width: 180,
+        marginHorizontal: 8,
     },
 });
 

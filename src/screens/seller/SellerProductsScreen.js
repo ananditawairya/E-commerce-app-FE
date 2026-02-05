@@ -110,7 +110,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
           accessibilityLabel="Logout"
           accessibilityHint="Logout from the application"
         >
-          <MaterialIcons name="logout" size={24} color="#007AFF" />
+          <MaterialIcons name="logout" size={24} color="#2563EB" />
         </TouchableOpacity>
       </View>
 
@@ -148,21 +148,21 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F7F7F8',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 12,
+    backgroundColor: '#F7F7F8',
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#111827',
   },
   loadingContainer: {
     flex: 1,
@@ -170,13 +170,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: {
-    padding: 15,
+    padding: 16,
   },
   productCard: {
     backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E6E8EB',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   productHeader: {
     flexDirection: 'row',
@@ -188,23 +195,23 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
     marginBottom: 4,
   },
   productCategory: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     marginBottom: 4,
   },
   productPrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#2563EB',
     marginBottom: 4,
   },
   productStatus: {
     fontSize: 12,
-    color: '#28a745',
+    color: '#16A34A',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -215,7 +222,7 @@ const styles = StyleSheet.create({
   },
   variantsText: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     marginTop: 8,
   },
   emptyContainer: {
@@ -226,7 +233,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: '#9CA3AF',
     marginTop: 10,
   },
   fab: {
@@ -236,13 +243,13 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
   },
 });

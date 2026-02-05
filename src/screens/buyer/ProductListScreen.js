@@ -28,6 +28,9 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [userId, setUserId] = useState(null);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const LIMIT = 10;
 
   React.useEffect(() => {
     const getUserId = async () => {
@@ -37,8 +40,15 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     getUserId();
   }, []);
 
-  const { data, loading, refetch } = useQuery(GET_PRODUCTS, {
-    variables: { search, category: selectedCategory || null, limit: 100 },
+  const { data, loading, fetchMore, refetch } = useQuery(GET_PRODUCTS, {
+    variables: { search, category: selectedCategory || null, limit: LIMIT, offset: 0 },
+    onCompleted: (data) => {
+      if (data?.products.length < LIMIT) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+      }
+    }
   });
 
   const { data: recData, loading: recLoading } = useQuery(GET_RECOMMENDATIONS, {
@@ -105,7 +115,11 @@ const ProductListScreen = ({ navigation, onLogout }) => {
         styles.categoryChip,
         selectedCategory === item && styles.categoryChipActive,
       ]}
-      onPress={() => setSelectedCategory(selectedCategory === item ? '' : item)}
+      onPress={() => {
+        setSelectedCategory(selectedCategory === item ? '' : item);
+        setOffset(0);
+        setHasMore(true);
+      }}
     >
       <Text
         style={[
@@ -117,6 +131,30 @@ const ProductListScreen = ({ navigation, onLogout }) => {
       </Text>
     </TouchableOpacity>
   );
+
+  const loadMore = () => {
+    if (!hasMore || loading) return;
+
+    const newOffset = offset + LIMIT;
+    fetchMore({
+      variables: {
+        offset: newOffset,
+      },
+      updateQuery: (prev, { fetchMoreResult }) => {
+        if (!fetchMoreResult || fetchMoreResult.products.length === 0) {
+          setHasMore(false);
+          return prev;
+        }
+        if (fetchMoreResult.products.length < LIMIT) {
+          setHasMore(false);
+        }
+        return {
+          products: [...prev.products, ...fetchMoreResult.products],
+        };
+      },
+    });
+    setOffset(newOffset);
+  };
 
   const renderHeader = () => (
     <View>
@@ -154,7 +192,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
             accessibilityLabel="Logout"
             accessibilityHint="Logout from the application"
           >
-            <MaterialIcons name="logout" size={24} color="#007AFF" />
+            <MaterialIcons name="logout" size={24} color="#2563EB" />
           </TouchableOpacity>
         </View>
 
@@ -182,12 +220,13 @@ const ProductListScreen = ({ navigation, onLogout }) => {
             showsHorizontalScrollIndicator={false}
             style={styles.categoriesList}
             contentContainerStyle={styles.categoriesContent}
+            ItemSeparatorComponent={() => <View style={styles.categorySeparator} />}
           />
         )}
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color="#2563EB" />
           </View>
         ) : (
           <FlatList
@@ -196,14 +235,29 @@ const ProductListScreen = ({ navigation, onLogout }) => {
             keyExtractor={(item) => item.id}
             numColumns={2}
             contentContainerStyle={styles.productsGrid}
-            onRefresh={refetch}
-            refreshing={loading}
+            onRefresh={() => {
+              setOffset(0);
+              setHasMore(true);
+              refetch();
+            }}
+            refreshing={loading && offset === 0}
             ListHeaderComponent={renderHeader}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={() => (
+              loading && offset > 0 ? (
+                <View style={styles.footerLoader}>
+                  <ActivityIndicator size="small" color="#2563EB" />
+                </View>
+              ) : null
+            )}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <MaterialIcons name="shopping-bag" size={60} color="#ccc" />
-                <Text style={styles.emptyText}>No products found</Text>
-              </View>
+              !loading && (
+                <View style={styles.emptyContainer}>
+                  <MaterialIcons name="shopping-bag" size={60} color="#ccc" />
+                  <Text style={styles.emptyText}>No products found</Text>
+                </View>
+              )
             }
           />
         )}
@@ -218,31 +272,34 @@ const ProductListScreen = ({ navigation, onLogout }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 20,
+    paddingTop: 60, // Adjusted for notch
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -1,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    margin: 15,
-    paddingHorizontal: 15,
-    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#F3F4F6',
   },
   searchIcon: {
     marginRight: 10,
@@ -251,108 +308,122 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
+    color: '#111827',
+    fontWeight: '500',
   },
   categoriesList: {
-    maxHeight: 60,
-    marginBottom: 5,
+    maxHeight: 72,
+    marginBottom: 10,
   },
   categoriesContent: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    paddingBottom: 12,
   },
   categoryChip: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    marginRight: 10,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    height: 40,
+    minHeight: 36,
   },
   categoryChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
   },
   categoryText: {
     fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+    color: '#111827',
+    fontWeight: '600',
   },
   categoryTextActive: {
-    color: '#fff',
+    color: '#FFFFFF',
+  },
+  categorySeparator: {
+    width: 8,
   },
   productsGrid: {
-    padding: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 40,
   },
   productCard: {
     flex: 1,
-    margin: 5,
+    margin: 6,
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 16,
     overflow: 'hidden',
     maxWidth: '48%',
   },
   productImage: {
     width: '100%',
-    height: 150,
+    height: 160,
     resizeMode: 'cover',
   },
   placeholderImage: {
     width: '100%',
-    height: 150,
-    backgroundColor: '#f0f0f0',
+    height: 160,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   productInfo: {
-    padding: 10,
+    padding: 12,
   },
   productName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
     marginBottom: 4,
   },
   productCategory: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     marginBottom: 4,
   },
   productPrice: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontWeight: '700',
+    color: '#2563EB',
   },
   mainProductCard: {
     flex: 1,
-    margin: 5,
+    margin: 6,
     maxWidth: '48%',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    paddingHorizontal: 15,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+    paddingHorizontal: 20,
     marginTop: 10,
-    marginBottom: 5,
+    marginBottom: 12,
+    letterSpacing: -0.5,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  footerLoader: {
+    paddingVertical: 20,
     alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 50,
+    marginTop: 80,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#999',
-    marginTop: 10,
+    fontSize: 18,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    marginTop: 16,
   },
 });
 

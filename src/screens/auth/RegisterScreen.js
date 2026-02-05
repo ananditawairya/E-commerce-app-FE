@@ -283,46 +283,48 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F7F8',
   },
   content: {
-    padding: 20,
+    padding: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    color: '#333',
+    fontSize: 30,
+    fontWeight: '700',
+    marginBottom: 24,
+    color: '#111827',
   },
   // CHANGE: Add input container for error message spacing
   inputContainer: {
-    marginBottom: 15,
+    marginBottom: 14,
   },
   input: {
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
+    borderColor: '#E6E8EB',
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    color: '#111827',
   },
   // CHANGE: Add error state styling
   inputError: {
-    borderColor: '#ff3b30',
-    borderWidth: 2,
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
   },
   // CHANGE: Add error text styling
   errorText: {
-    color: '#ff3b30',
+    color: '#EF4444',
     fontSize: 12,
-    marginTop: 5,
-    marginLeft: 5,
+    marginTop: 6,
+    marginLeft: 6,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 10,
     marginTop: 5,
-    color: '#333',
+    color: '#111827',
   },
   roleContainer: {
     flexDirection: 'row',
@@ -331,35 +333,36 @@ const styles = StyleSheet.create({
   },
   roleButton: {
     flex: 1,
-    borderWidth: 2,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
+    borderWidth: 1,
+    borderColor: '#E6E8EB',
+    borderRadius: 14,
+    padding: 14,
     alignItems: 'center',
+    backgroundColor: '#fff',
   },
   roleButtonActive: {
-    borderColor: '#007AFF',
-    backgroundColor: '#007AFF',
+    borderColor: '#2563EB',
+    backgroundColor: '#E8F0FF',
   },
   roleText: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
     fontWeight: '600',
   },
   roleTextActive: {
-    color: '#fff',
+    color: '#1D4ED8',
   },
   button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
     padding: 15,
     alignItems: 'center',
     marginTop: 10,
   },
   // CHANGE: Add disabled button styling
   buttonDisabled: {
-    backgroundColor: '#B0D4FF',
-    opacity: 0.6,
+    backgroundColor: '#AFC7FF',
+    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',
@@ -373,10 +376,10 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
   },
   linkTextBold: {
-    color: '#007AFF',
+    color: '#2563EB',
     fontWeight: '600',
   },
 });

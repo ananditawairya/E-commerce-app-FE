@@ -109,7 +109,7 @@ const CheckoutScreen = ({ navigation }) => {
           accessibilityLabel="Go back to cart"
           accessibilityHint="Navigate back to shopping cart"
         >
-          <MaterialIcons name="arrow-back" size={24} color="#007AFF" />
+          <MaterialIcons name="arrow-back" size={24} color="#2563EB" />
         </TouchableOpacity>
       ),
       headerStyle: {
@@ -264,7 +264,7 @@ const CheckoutScreen = ({ navigation }) => {
   if (cartLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
   }
@@ -377,7 +377,7 @@ const CheckoutScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F7F7F8',
     padding: 20,
   },
   loadingContainer: {
@@ -392,8 +392,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 15,
     marginTop: 10,
   },
@@ -404,19 +404,20 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
+    borderColor: '#E6E8EB',
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    color: '#111827',
   },
   // CHANGE: Add error state styling
   inputError: {
-    borderColor: '#ff3b30',
-    borderWidth: 2,
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
   },
   // CHANGE: Add error text styling
   errorText: {
-    color: '#ff3b30',
+    color: '#EF4444',
     fontSize: 12,
     marginTop: 5,
     marginLeft: 5,
@@ -430,9 +431,11 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E6E8EB',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -441,40 +444,40 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
   },
   summaryValue: {
     fontSize: 14,
-    color: '#333',
+    color: '#111827',
     fontWeight: '500',
   },
   totalLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
   },
   totalValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#2563EB',
   },
   paymentNote: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
     textAlign: 'center',
     marginBottom: 20,
   },
   placeOrderButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
     padding: 16,
     alignItems: 'center',
     marginBottom: 30,
   },
   // CHANGE: Add disabled button styling
   placeOrderButtonDisabled: {
-    backgroundColor: '#B0D4FF',
-    opacity: 0.6,
+    backgroundColor: '#AFC7FF',
+    opacity: 0.7,
   },
   placeOrderText: {
     color: '#fff',

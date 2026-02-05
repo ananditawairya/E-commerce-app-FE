@@ -195,55 +195,57 @@ const LoginScreen = ({ navigation, onAuthSuccess }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 24,
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F7F8',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+    fontSize: 30,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#111827',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 24,
   },
   // CHANGE: Add input container for error message spacing
   inputContainer: {
-    marginBottom: 15,
+    marginBottom: 14,
   },
   input: {
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
+    borderColor: '#E6E8EB',
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    color: '#111827',
   },
   // CHANGE: Add error state styling
   inputError: {
-    borderColor: '#ff3b30',
-    borderWidth: 2,
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
   },
   // CHANGE: Add error text styling
   errorText: {
-    color: '#ff3b30',
+    color: '#EF4444',
     fontSize: 12,
-    marginTop: 5,
-    marginLeft: 5,
+    marginTop: 6,
+    marginLeft: 6,
   },
   button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
     padding: 15,
     alignItems: 'center',
     marginTop: 10,
   },
   // CHANGE: Add disabled button styling
   buttonDisabled: {
-    backgroundColor: '#B0D4FF',
-    opacity: 0.6,
+    backgroundColor: '#AFC7FF',
+    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',
@@ -256,10 +258,10 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
   },
   linkTextBold: {
-    color: '#007AFF',
+    color: '#2563EB',
     fontWeight: '600',
   },
 });
