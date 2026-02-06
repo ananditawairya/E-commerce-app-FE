@@ -57,16 +57,16 @@ const CartScreen = ({ navigation }) => {
         onPress: () => {
           removeFromCart({ variables: { productId, variantId } });
 
-          // Track remove_from_cart event
+          // Track cart_remove event
           if (userId) {
             trackEvent({
               variables: {
                 userId,
                 productId,
-                eventType: 'remove_from_cart',
+                eventType: 'cart_remove',
                 metadata: JSON.stringify({ variantId })
               }
-            }).catch(err => console.error('Tracking error (remove_from_cart):', err));
+            }).catch(err => console.error('Tracking error (cart_remove):', err));
           }
         },
       },

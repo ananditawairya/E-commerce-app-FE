@@ -229,17 +229,17 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
     addToCart({ variables });
 
-    // Track add_to_cart event
+    // Track cart_add event
     if (userId) {
       trackEvent({
         variables: {
           userId,
           productId: product.id,
-          eventType: 'add_to_cart',
+          eventType: 'cart_add',
           category: product.category,
           metadata: JSON.stringify({ variantId: selectedVariant?.id, quantity })
         }
-      }).catch(err => console.error('Tracking error (add_to_cart):', err));
+      }).catch(err => console.error('Tracking error (cart_add):', err));
     }
   };
 

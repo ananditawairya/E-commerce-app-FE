@@ -28,6 +28,9 @@ const ChatBot = ({ navigation }) => {
             role: 'assistant',
             content: "Hi! 👋 I'm your personal AI shopping assistant. \n\nI can help you find products, compare options, or suggest the perfect gear for your next adventure. What's on your mind today?",
             products: [],
+            appliedFilters: [],
+            followUpQuestion: null,
+            metadata: null,
         },
     ]);
     const [conversationId, setConversationId] = useState(null);
@@ -36,6 +39,59 @@ const ChatBot = ({ navigation }) => {
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     const [sendChatMessage, { loading }] = useMutation(SEND_CHAT_MESSAGE);
+
+    const createMessageId = (suffix = '') => {
+        return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}${suffix}`;
+    };
+
+    const formatCurrency = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) {
+            return '$0.00';
+        }
+        return `$${numeric.toFixed(2)}`;
+    };
+
+    const stripTechnicalIds = (text) => {
+        if (typeof text !== 'string') {
+            return '';
+        }
+
+        return text
+            .replace(/\(ID:\s*[A-Za-z0-9-]+\)/gi, '')
+            .replace(/\bID:\s*[A-Za-z0-9-]+\b/gi, '')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    };
+
+    const normalizeAssistantText = (text) => {
+        const cleaned = stripTechnicalIds(text || '');
+        if (!cleaned) {
+            return "I found a few options for you. Tell me your budget or preferred style and I'll refine them.";
+        }
+
+        return cleaned
+            .replace(/\s+\|/g, ' |')
+            .replace(/\|\s+/g, ' | ')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    };
+
+    const getAssistantMetadata = (payload) => {
+        if (!payload) {
+            return null;
+        }
+
+        const latencyMs = Number(payload.latencyMs);
+        return {
+            latencyMs: Number.isFinite(latencyMs) ? latencyMs : null,
+            cacheHit: Boolean(payload.cacheHit),
+            safetyBlocked: Boolean(payload.safetyBlocked),
+            semanticUsed: Boolean(payload.semanticUsed),
+        };
+    };
 
     useEffect(() => {
         const getUserId = async () => {
@@ -69,7 +125,7 @@ const ChatBot = ({ navigation }) => {
         if (!message.trim() || loading) return;
 
         const userMessage = {
-            id: Date.now().toString(),
+            id: createMessageId('_user'),
             role: 'user',
             content: message.trim(),
             products: [],
@@ -91,11 +147,19 @@ const ChatBot = ({ navigation }) => {
             if (data?.sendChatMessage) {
                 setConversationId(data.sendChatMessage.conversationId);
 
+                const assistantContent = data.sendChatMessage.message ||
+                    "I found a few options for you. Tell me your budget or preferred style and I'll refine them.";
+
                 const aiMessage = {
-                    id: Date.now().toString() + '_ai',
+                    id: createMessageId('_ai'),
                     role: 'assistant',
-                    content: data.sendChatMessage.message,
+                    content: normalizeAssistantText(assistantContent),
                     products: data.sendChatMessage.products || [],
+                    appliedFilters: Array.isArray(data.sendChatMessage.appliedFilters)
+                        ? data.sendChatMessage.appliedFilters
+                        : [],
+                    followUpQuestion: data.sendChatMessage.followUpQuestion || null,
+                    metadata: getAssistantMetadata(data.sendChatMessage),
                 };
 
                 setMessages(prev => [...prev, aiMessage]);
@@ -105,10 +169,13 @@ const ChatBot = ({ navigation }) => {
             setMessages(prev => [
                 ...prev,
                 {
-                    id: Date.now().toString() + '_error',
+                    id: createMessageId('_error'),
                     role: 'assistant',
                     content: "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
                     products: [],
+                    appliedFilters: [],
+                    followUpQuestion: null,
+                    metadata: null,
                 },
             ]);
         }
@@ -157,7 +224,7 @@ const ChatBot = ({ navigation }) => {
 
     const renderProductCard = (product) => (
         <TouchableOpacity
-            key={product.id}
+            key={product.id || `${product.name || 'product'}_${String(product.basePrice || 0)}`}
             style={styles.productCard}
             onPress={() => handleProductPress(product)}
         >
@@ -170,7 +237,7 @@ const ChatBot = ({ navigation }) => {
             )}
             <View style={styles.productInfo}>
                 <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
-                <Text style={styles.productPrice}>${product.basePrice}</Text>
+                <Text style={styles.productPrice}>{formatCurrency(product.basePrice)}</Text>
             </View>
         </TouchableOpacity>
     );
@@ -178,9 +245,36 @@ const ChatBot = ({ navigation }) => {
     const renderItem = ({ item }) => (
         <View>
             {renderMessage({ item })}
+            {item.role === 'assistant' && Array.isArray(item.appliedFilters) && item.appliedFilters.length > 0 && (
+                <View style={styles.filterChipRow}>
+                    {item.appliedFilters.slice(0, 4).map((filter) => (
+                        <View key={`${item.id}_${filter}`} style={styles.filterChip}>
+                            <Text style={styles.filterChipText} numberOfLines={1}>{filter}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {item.role === 'assistant' && item.followUpQuestion && (
+                <View style={styles.followUpContainer}>
+                    <Text style={styles.followUpText}>{item.followUpQuestion}</Text>
+                </View>
+            )}
             {item.products && item.products.length > 0 && (
                 <View style={styles.productsRow}>
                     {item.products.slice(0, 3).map(renderProductCard)}
+                </View>
+            )}
+            {item.role === 'assistant' && item.metadata && (
+                <View style={styles.metaRow}>
+                    {typeof item.metadata.latencyMs === 'number' && (
+                        <Text style={styles.metaText}>~{item.metadata.latencyMs}ms</Text>
+                    )}
+                    {item.metadata.cacheHit && (
+                        <Text style={styles.metaText}>cache</Text>
+                    )}
+                    {item.metadata.semanticUsed && (
+                        <Text style={styles.metaText}>semantic</Text>
+                    )}
                 </View>
             )}
         </View>
@@ -235,6 +329,8 @@ const ChatBot = ({ navigation }) => {
                             keyExtractor={(item) => item.id}
                             contentContainerStyle={styles.messagesList}
                             onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+                            onLayout={() => flatListRef.current?.scrollToEnd()}
+                            keyboardShouldPersistTaps="handled"
                             showsVerticalScrollIndicator={false}
                         />
 
@@ -393,6 +489,49 @@ const styles = StyleSheet.create({
         marginLeft: 40,
         marginBottom: 16,
         paddingTop: 4,
+    },
+    filterChipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginLeft: 40,
+        marginTop: -4,
+        marginBottom: 8,
+    },
+    filterChip: {
+        backgroundColor: '#EEF4FF',
+        borderColor: '#D9E6FF',
+        borderWidth: 1,
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        maxWidth: '90%',
+        marginRight: 6,
+        marginBottom: 6,
+    },
+    filterChipText: {
+        color: '#1D4ED8',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    followUpContainer: {
+        marginLeft: 40,
+        marginBottom: 8,
+    },
+    followUpText: {
+        fontSize: 13,
+        color: '#4B5563',
+        fontStyle: 'italic',
+    },
+    metaRow: {
+        flexDirection: 'row',
+        marginLeft: 40,
+        marginTop: -6,
+        marginBottom: 10,
+    },
+    metaText: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        marginRight: 8,
     },
     productCard: {
         width: 120,

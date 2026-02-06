@@ -251,6 +251,12 @@ export const SEND_CHAT_MESSAGE = gql`
       conversationId: $conversationId
     ) {
       message
+      followUpQuestion
+      appliedFilters
+      latencyMs
+      cacheHit
+      safetyBlocked
+      semanticUsed
       products {
         id
         name
