@@ -4,8 +4,26 @@ import { gql } from '@apollo/client';
 
 // CHANGE: Enhanced GET_PRODUCTS to include formattedDescription and effectivePrice for variants
 export const GET_PRODUCTS = gql`
-  query GetProducts($search: String, $category: String, $limit: Int, $offset: Int) {
-    products(search: $search, category: $category, limit: $limit, offset: $offset) {
+  query GetProducts(
+    $search: String
+    $category: String
+    $minPrice: Float
+    $maxPrice: Float
+    $inStockOnly: Boolean
+    $sortBy: ProductSortBy
+    $limit: Int
+    $offset: Int
+  ) {
+    products(
+      search: $search
+      category: $category
+      minPrice: $minPrice
+      maxPrice: $maxPrice
+      inStockOnly: $inStockOnly
+      sortBy: $sortBy
+      limit: $limit
+      offset: $offset
+    ) {
       id
       name
       description
