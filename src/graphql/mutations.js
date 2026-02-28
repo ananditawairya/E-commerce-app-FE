@@ -275,3 +275,43 @@ export const SEND_CHAT_MESSAGE = gql`
     }
   }
 `;
+
+export const ADD_ADDRESS = gql`
+  mutation AddAddress($address: AddressInput!) {
+    addAddress(address: $address) {
+      id
+      street
+      city
+      state
+      zipCode
+      country
+      isDefault
+    }
+  }
+`;
+
+export const UPDATE_ADDRESS = gql`
+  mutation UpdateAddress($id: ID!, $address: AddressInput!) {
+    updateAddress(id: $id, address: $address) {
+      id
+      street
+      city
+      state
+      zipCode
+      country
+      isDefault
+    }
+  }
+`;
+
+export const REMOVE_ADDRESS = gql`
+  mutation RemoveAddress($id: ID!) {
+    removeAddress(id: $id)
+  }
+`;
+
+export const SET_DEFAULT_ADDRESS = gql`
+  mutation SetDefaultAddress($id: ID!) {
+    setDefaultAddress(id: $id)
+  }
+`;

@@ -86,6 +86,26 @@ export const GET_CATEGORIES = gql`
   }
 `;
 
+export const ME = gql`
+  query Me($token: String!) {
+    me(token: $token) {
+      id
+      email
+      name
+      role
+      addresses {
+        id
+        street
+        city
+        state
+        zipCode
+        country
+        isDefault
+      }
+    }
+  }
+`;
+
 export const GET_MY_CART = gql`
   query GetMyCart {
     myCart {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -44,6 +44,7 @@ const getInventoryBadge = (product) => {
 };
 
 const ProductCard = ({ product, onPress, style }) => {
+  const [imageError, setImageError] = useState(false);
   const inventoryBadge = getInventoryBadge(product);
 
   return (
@@ -53,8 +54,12 @@ const ProductCard = ({ product, onPress, style }) => {
       activeOpacity={0.9}
     >
       <View style={styles.imageWrapper}>
-        {product.images && product.images.length > 0 ? (
-          <Image source={{ uri: product.images[0] }} style={styles.productImage} />
+        {product.images && product.images.length > 0 && !imageError ? (
+          <Image
+            source={{ uri: product.images[0] }}
+            style={styles.productImage}
+            onError={() => setImageError(true)}
+          />
         ) : (
           <View style={styles.placeholderImage}>
             <MaterialIcons name="image" size={44} color="#D1D5DB" />

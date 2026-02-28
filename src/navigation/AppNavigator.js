@@ -14,6 +14,8 @@ import ProductListScreen from '../screens/buyer/ProductListScreen';
 import ProductDetailScreen from '../screens/buyer/ProductDetailScreen';
 import CartScreen from '../screens/buyer/CartScreen';
 import CheckoutScreen from '../screens/buyer/CheckoutScreen';
+import ProfileScreen from '../screens/buyer/ProfileScreen';
+import OrderHistoryScreen from '../screens/buyer/OrderHistoryScreen';
 
 // Seller Screens
 import SellerProductsScreen from '../screens/seller/SellerProductsScreen';
@@ -55,6 +57,9 @@ const BuyerTabs = ({ onLogout }) => {
         {(props) => <ProductListScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
       <Tab.Screen name="Cart" component={CartScreen} />
+      <Tab.Screen name="Profile">
+        {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 };
@@ -105,56 +110,56 @@ const AppNavigator = () => {
     checkAuth();
   }, []);
 
- const checkAuth = async () => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    const role = await AsyncStorage.getItem('userRole');
-    
-    if (token && role) {
-      // CHANGE: Validate token before setting authenticated state
-      try {
-        const response = await fetch('http://localhost:4000/graphql', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            query: `query { me(token: "${token}") { id } }`,
-          }),
-        });
-        
-        const result = await response.json();
-        
-        if (result.errors || !result.data?.me) {
-          // CHANGE: Token invalid - clear storage and stay logged out
+  const checkAuth = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      const role = await AsyncStorage.getItem('userRole');
+
+      if (token && role) {
+        // CHANGE: Validate token before setting authenticated state
+        try {
+          const response = await fetch('http://localhost:4000/graphql', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              query: `query { me(token: "${token}") { id } }`,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.errors || !result.data?.me) {
+            // CHANGE: Token invalid - clear storage and stay logged out
+            await AsyncStorage.clear();
+            console.log('⚠️ Invalid token cleared on startup');
+            return;
+          }
+
+          // CHANGE: Token valid - proceed with authenticated state
+          setIsAuthenticated(true);
+          setUserRole(role);
+        } catch (validationError) {
+          // CHANGE: Validation failed - clear storage
+          console.log('Token validation error:', validationError);
           await AsyncStorage.clear();
-          console.log('⚠️ Invalid token cleared on startup');
-          return;
         }
-        
-        // CHANGE: Token valid - proceed with authenticated state
-        setIsAuthenticated(true);
-        setUserRole(role);
-      } catch (validationError) {
-        // CHANGE: Validation failed - clear storage
-        console.log('Token validation error:', validationError);
-        await AsyncStorage.clear();
       }
+    } catch (error) {
+      console.log('Auth check error:', error);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.log('Auth check error:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // CHANGE: Add authentication success handler to update state
   const handleAuthSuccess = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       const role = await AsyncStorage.getItem('userRole');
-      
+
       if (token && role) {
         setIsAuthenticated(true);
         setUserRole(role);
@@ -204,18 +209,25 @@ const AppNavigator = () => {
               {/* CHANGE: Pass onLogout callback to BuyerTabs */}
               {(props) => <BuyerTabs {...props} onLogout={handleLogout} />}
             </Stack.Screen>
-            <Stack.Screen 
-              name="ProductDetail" 
+            <Stack.Screen
+              name="ProductDetail"
               component={ProductDetailScreen}
-              options={{ 
+              options={{
                 // CHANGE: Remove title and headerShown from here since ProductDetailScreen handles it
                 headerShown: false,
               }}
             />
-            <Stack.Screen 
-              name="Checkout" 
+            <Stack.Screen
+              name="Checkout"
               component={CheckoutScreen}
-              options={{ 
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="OrderHistory"
+              component={OrderHistoryScreen}
+              options={{
                 headerShown: false,
               }}
             />
@@ -226,10 +238,10 @@ const AppNavigator = () => {
               {/* CHANGE: Pass onLogout callback to SellerTabs */}
               {(props) => <SellerTabs {...props} onLogout={handleLogout} />}
             </Stack.Screen>
-            <Stack.Screen 
-              name="AddProduct" 
+            <Stack.Screen
+              name="AddProduct"
               component={AddProductScreen}
-              options={{ 
+              options={{
                 headerShown: true,
                 headerBackTitleVisible: false,
               }}

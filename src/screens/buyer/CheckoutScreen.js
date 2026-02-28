@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_MY_CART } from '../../graphql/queries';
+import { GET_MY_CART, ME } from '../../graphql/queries';
 import { CHECKOUT, TRACK_EVENT } from '../../graphql/mutations';
 // CHANGE: Import MaterialIcons for back button icon
 import { MaterialIcons } from '@expo/vector-icons';
@@ -30,14 +30,45 @@ const CheckoutScreen = ({ navigation }) => {
   const [zipCode, setZipCode] = useState('');
   const [country, setCountry] = useState('');
   const [userId, setUserId] = useState(null);
+  const [token, setToken] = useState(null);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
 
   React.useEffect(() => {
-    const getUserId = async () => {
+    const getData = async () => {
       const id = await AsyncStorage.getItem('userId');
+      const storedToken = await AsyncStorage.getItem('accessToken');
       setUserId(id);
+      setToken(storedToken);
     };
-    getUserId();
+    getData();
   }, []);
+
+  const { data: userData, loading: userLoading } = useQuery(ME, {
+    variables: { token },
+    skip: !token,
+    onCompleted: (data) => {
+      const defaultAddr = data?.me?.addresses?.find(a => a.isDefault);
+      if (defaultAddr) {
+        selectAddress(defaultAddr);
+      }
+    },
+  });
+
+  const selectAddress = (addr) => {
+    setSelectedAddressId(addr.id);
+    setStreet(addr.street);
+    setCity(addr.city);
+    setState(addr.state);
+    setZipCode(addr.zipCode);
+    setCountry(addr.country);
+
+    // Clear errors
+    setStreetError('');
+    setCityError('');
+    setStateError('');
+    setZipCodeError('');
+    setCountryError('');
+  };
 
   // CHANGE: Add validation error states
   const [streetError, setStreetError] = useState('');
@@ -273,6 +304,45 @@ const CheckoutScreen = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.container}>
+      {userData?.me?.addresses?.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Select Saved Address</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.addressList}
+          >
+            {userData.me.addresses.map((address) => (
+              <TouchableOpacity
+                key={address.id}
+                style={[
+                  styles.addressCard,
+                  selectedAddressId === address.id && styles.selectedAddressCard,
+                ]}
+                onPress={() => selectAddress(address)}
+              >
+                <View style={styles.addressCardHeader}>
+                  <MaterialIcons
+                    name={selectedAddressId === address.id ? 'check-circle' : 'radio-button-unchecked'}
+                    size={20}
+                    color={selectedAddressId === address.id ? '#2563EB' : '#9CA3AF'}
+                  />
+                  {address.isDefault && (
+                    <View style={styles.defaultBadge}>
+                      <Text style={styles.defaultText}>Default</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.addressStreet} numberOfLines={1}>{address.street}</Text>
+                <Text style={styles.addressCity} numberOfLines={1}>
+                  {address.city}, {address.state}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>
+      )}
+
       <Text style={styles.sectionTitle}>Shipping Address</Text>
 
       <View style={styles.inputContainer}>
@@ -483,6 +553,50 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  addressList: {
+    marginBottom: 20,
+  },
+  addressCard: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E6E8EB',
+    borderRadius: 14,
+    padding: 16,
+    width: 200,
+    marginRight: 12,
+  },
+  selectedAddressCard: {
+    borderColor: '#2563EB',
+    borderWidth: 2,
+    backgroundColor: '#F0F7FF',
+  },
+  addressCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  defaultBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  defaultText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  addressStreet: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  addressCity: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
   },
 });
 
