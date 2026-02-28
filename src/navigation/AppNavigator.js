@@ -110,16 +110,47 @@ const AppNavigator = () => {
     checkAuth();
   }, []);
 
+  // Attempt to refresh the access token using the stored refresh token
+  const tryRefreshToken = async () => {
+    try {
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      if (!refreshToken) return false;
+
+      console.log('🔄 Attempting token refresh on startup...');
+
+      const response = await fetch('http://65.0.242.12/api/auth/refresh-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      if (!data.accessToken) return false;
+
+      await AsyncStorage.setItem('accessToken', data.accessToken);
+      if (data.refreshToken) {
+        await AsyncStorage.setItem('refreshToken', data.refreshToken);
+      }
+
+      console.log('✅ Token refreshed on startup');
+      return true;
+    } catch (error) {
+      console.log('❌ Token refresh failed on startup:', error.message);
+      return false;
+    }
+  };
+
   const checkAuth = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       const role = await AsyncStorage.getItem('userRole');
 
       if (token && role) {
-        // CHANGE: Validate token before setting authenticated state
+        // Validate token before setting authenticated state
         try {
           const response = await fetch('http://65.0.242.12/graphql', {
-            //           const response = await fetch('http://localhost:4000/graphql', { older line
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -133,19 +164,32 @@ const AppNavigator = () => {
           const result = await response.json();
 
           if (result.errors || !result.data?.me) {
-            // CHANGE: Token invalid - clear storage and stay logged out
-            await AsyncStorage.clear();
-            console.log('⚠️ Invalid token cleared on startup');
+            // Token invalid — attempt refresh before logging out
+            console.log('⚠️ Access token expired, attempting refresh...');
+            const refreshed = await tryRefreshToken();
+            if (refreshed) {
+              setIsAuthenticated(true);
+              setUserRole(role);
+            } else {
+              await AsyncStorage.clear();
+              console.log('⚠️ Refresh failed — user must re-login');
+            }
             return;
           }
 
-          // CHANGE: Token valid - proceed with authenticated state
+          // Token valid — proceed with authenticated state
           setIsAuthenticated(true);
           setUserRole(role);
         } catch (validationError) {
-          // CHANGE: Validation failed - clear storage
+          // Network error during validation — try refresh
           console.log('Token validation error:', validationError);
-          await AsyncStorage.clear();
+          const refreshed = await tryRefreshToken();
+          if (refreshed) {
+            setIsAuthenticated(true);
+            setUserRole(role);
+          } else {
+            await AsyncStorage.clear();
+          }
         }
       }
     } catch (error) {
