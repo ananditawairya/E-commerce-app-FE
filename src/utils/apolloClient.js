@@ -4,15 +4,16 @@ import { onError } from '@apollo/client/link/error';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RetryLink } from '@apollo/client/link/retry'; // CHANGE: Add retry link
 const httpLink = createHttpLink({
-  uri: 'http://localhost:4000/graphql',
+  uri: 'http://65.0.242.12/graphql',
+  //   uri: 'http://localhost:4000/graphql', older line
 });
 
 const authLink = setContext(async (_, { headers }) => {
   try {
     const token = await AsyncStorage.getItem('accessToken');
-    
+
     console.log('Apollo Auth Link - Token retrieved:', token ? 'Token exists' : 'No token found');
-    
+
     if (token && typeof token === 'string' && token.trim().length > 0) {
       console.log('Apollo Auth Link - Adding authorization header');
       return {
@@ -53,20 +54,20 @@ const retryLink = new RetryLink({
     max: 3, // Retry up to 3 times
     retryIf: (error, operation) => {
       // CHANGE: Retry only on rate limit (429) and network errors
-      const is429 = error?.statusCode === 429 || 
-                    error?.networkError?.statusCode === 429;
+      const is429 = error?.statusCode === 429 ||
+        error?.networkError?.statusCode === 429;
       const isNetworkError = !!error?.networkError && !error?.result;
-      
+
       // CHANGE: Don't retry auth operations to avoid account lockout
-      const isAuthOperation = 
-        operation.operationName === 'Login' || 
+      const isAuthOperation =
+        operation.operationName === 'Login' ||
         operation.operationName === 'Register';
-      
+
       if (isAuthOperation && is429) {
         console.warn('⚠️ Rate limit hit on auth operation - not retrying to avoid lockout');
         return false;
       }
-      
+
       return is429 || isNetworkError;
     },
   },
@@ -78,7 +79,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
       console.error(
         `GraphQL error: Message: ${message}, Location: ${locations}, Path: ${path}`
       );
-       // CHANGE: Log extension details for debugging
+      // CHANGE: Log extension details for debugging
       if (extensions) {
         console.error('Error extensions:', extensions);
       }
@@ -93,11 +94,11 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
     if (networkError.result) {
       console.error(`Network Error Result:`, networkError.result);
     }
-       // CHANGE: Enhanced logging for rate limit errors
+    // CHANGE: Enhanced logging for rate limit errors
     if (networkError.statusCode === 429) {
       console.error('❌ Rate limit exceeded - request will be retried with backoff');
     }
-     // CHANGE: Handle 401/403 specifically
+    // CHANGE: Handle 401/403 specifically
     if (networkError.statusCode === 401 || networkError.statusCode === 403) {
       console.error('❌ Authentication failed - token may be invalid or expired');
     }

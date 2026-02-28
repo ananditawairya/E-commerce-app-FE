@@ -118,7 +118,8 @@ const AppNavigator = () => {
       if (token && role) {
         // CHANGE: Validate token before setting authenticated state
         try {
-          const response = await fetch('http://localhost:4000/graphql', {
+          const response = await fetch('http://65.0.242.12/graphql', {
+            //           const response = await fetch('http://localhost:4000/graphql', { older line
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
