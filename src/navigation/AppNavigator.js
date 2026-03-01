@@ -22,6 +22,7 @@ import SellerProductsScreen from '../screens/seller/SellerProductsScreen';
 import AddProductScreen from '../screens/seller/AddProductScreen';
 import OrdersScreen from '../screens/seller/OrdersScreen';
 import AnalyticsScreen from '../screens/seller/AnalyticsScreen';
+import { API_BASE_URL } from '../config/api';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -119,7 +120,7 @@ const AppNavigator = () => {
 
       console.log('🔄 Attempting token refresh on startup...');
 
-      const response = await fetch('http://65.0.242.12/api/auth/refresh-token', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
@@ -151,7 +152,7 @@ const AppNavigator = () => {
       if (token && role) {
         // Validate token before setting authenticated state
         try {
-          const response = await fetch('http://65.0.242.12/graphql', {
+          const response = await fetch(`${API_BASE_URL}/graphql`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

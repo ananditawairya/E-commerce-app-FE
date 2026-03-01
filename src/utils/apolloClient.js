@@ -4,8 +4,7 @@ import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RetryLink } from '@apollo/client/link/retry';
-
-const API_BASE_URL = 'http://65.0.242.12';
+import { API_BASE_URL } from '../config/api';
 
 const httpLink = createHttpLink({
   uri: `${API_BASE_URL}/graphql`,
