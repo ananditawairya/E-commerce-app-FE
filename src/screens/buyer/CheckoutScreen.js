@@ -8,13 +8,14 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_MY_CART, ME } from '../../graphql/queries';
-import { CHECKOUT, TRACK_EVENT } from '../../graphql/mutations';
-// CHANGE: Import MaterialIcons for back button icon
+import { CHECKOUT, TRACK_EVENT, ADD_ADDRESS } from '../../graphql/mutations';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomDropdown from '../../atoms/CustomDropdown';
 import {
   validateStreet,
   validateCity,
@@ -22,6 +23,10 @@ import {
   validateZipCode,
   validateCountry,
 } from '../../utils/validators';
+import {
+  getStatesForCountry,
+  getCitiesForState,
+} from '../../utils/locationData';
 
 const CheckoutScreen = ({ navigation }) => {
   const [street, setStreet] = useState('');
@@ -32,6 +37,25 @@ const CheckoutScreen = ({ navigation }) => {
   const [userId, setUserId] = useState(null);
   const [token, setToken] = useState(null);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
+
+  const [showSaveAddressModal, setShowSaveAddressModal] = useState(false);
+  const [pendingCheckout, setPendingCheckout] = useState(false);
+
+  const [streetError, setStreetError] = useState('');
+  const [cityError, setCityError] = useState('');
+  const [stateError, setStateError] = useState('');
+  const [zipCodeError, setZipCodeError] = useState('');
+  const [countryError, setCountryError] = useState('');
+  const [touched, setTouched] = useState({
+    street: false,
+    city: false,
+    state: false,
+    zipCode: false,
+    country: false,
+  });
+
+  const availableStates = country ? getStatesForCountry(country) : [];
+  const availableCities = country && state ? getCitiesForState(country, state) : [];
 
   React.useEffect(() => {
     const getData = async () => {
@@ -57,12 +81,11 @@ const CheckoutScreen = ({ navigation }) => {
   const selectAddress = (addr) => {
     setSelectedAddressId(addr.id);
     setStreet(addr.street);
-    setCity(addr.city);
-    setState(addr.state);
-    setZipCode(addr.zipCode);
     setCountry(addr.country);
+    setState(addr.state);
+    setCity(addr.city);
+    setZipCode(addr.zipCode);
 
-    // Clear errors
     setStreetError('');
     setCityError('');
     setStateError('');
@@ -70,30 +93,18 @@ const CheckoutScreen = ({ navigation }) => {
     setCountryError('');
   };
 
-  // CHANGE: Add validation error states
-  const [streetError, setStreetError] = useState('');
-  const [cityError, setCityError] = useState('');
-  const [stateError, setStateError] = useState('');
-  const [zipCodeError, setZipCodeError] = useState('');
-  const [countryError, setCountryError] = useState('');
-  const [touched, setTouched] = useState({
-    street: false,
-    city: false,
-    state: false,
-    zipCode: false,
-    country: false,
-  });
-
   const { data, loading: cartLoading } = useQuery(GET_MY_CART);
 
   const [trackEvent] = useMutation(TRACK_EVENT);
 
+  const [addAddress] = useMutation(ADD_ADDRESS, {
+    refetchQueries: [{ query: ME, variables: { token } }],
+  });
+
   const [checkout, { loading: checkoutLoading }] = useMutation(CHECKOUT, {
     onCompleted: (data) => {
-      // CHANGE: Handle single order response (backend returns first order for compatibility)
       const order = data.checkout;
 
-      // Track purchase events for each item in the cart
       if (userId && data?.myCart?.items) {
         data.myCart.items.forEach(item => {
           trackEvent({
@@ -128,7 +139,6 @@ const CheckoutScreen = ({ navigation }) => {
     },
   });
 
-  // CHANGE: Configure navigation header with back button
   React.useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
@@ -154,7 +164,6 @@ const CheckoutScreen = ({ navigation }) => {
     });
   }, [navigation]);
 
-  // CHANGE: Real-time validation handlers
   const handleStreetChange = (text) => {
     setStreet(text);
     if (touched.street) {
@@ -163,72 +172,81 @@ const CheckoutScreen = ({ navigation }) => {
     }
   };
 
-  const handleCityChange = (text) => {
-    setCity(text);
-    if (touched.city) {
-      const validation = validateCity(text);
-      setCityError(validation.error);
+  const handleCountryChange = (value) => {
+    setCountry(value);
+    setState('');
+    setCity('');
+    setZipCode('');
+    if (touched.country) {
+      const validation = validateCountry(value);
+      setCountryError(validation.error);
     }
+    setTouched(prev => ({ ...prev, country: true }));
   };
 
-  const handleStateChange = (text) => {
-    setState(text);
+  const handleStateChange = (value) => {
+    setState(value);
+    setCity('');
+    setZipCode('');
     if (touched.state) {
-      const validation = validateState(text);
+      const validation = validateState(value);
       setStateError(validation.error);
     }
+    setTouched(prev => ({ ...prev, state: true }));
+  };
+
+  const handleCityChange = (value) => {
+    setCity(value);
+    if (touched.city) {
+      const validation = validateCity(value);
+      setCityError(validation.error);
+    }
+    setTouched(prev => ({ ...prev, city: true }));
   };
 
   const handleZipCodeChange = (text) => {
     setZipCode(text);
     if (touched.zipCode) {
-      const validation = validateZipCode(text);
+      const validation = validateZipCode(text, country, state);
       setZipCodeError(validation.error);
     }
   };
 
-  const handleCountryChange = (text) => {
-    setCountry(text);
-    if (touched.country) {
-      const validation = validateCountry(text);
-      setCountryError(validation.error);
-    }
-  };
-
-  // CHANGE: Blur handlers
   const handleStreetBlur = () => {
     setTouched(prev => ({ ...prev, street: true }));
     const validation = validateStreet(street);
     setStreetError(validation.error);
   };
 
-  const handleCityBlur = () => {
-    setTouched(prev => ({ ...prev, city: true }));
-    const validation = validateCity(city);
-    setCityError(validation.error);
-  };
-
-  const handleStateBlur = () => {
-    setTouched(prev => ({ ...prev, state: true }));
-    const validation = validateState(state);
-    setStateError(validation.error);
-  };
-
   const handleZipCodeBlur = () => {
     setTouched(prev => ({ ...prev, zipCode: true }));
-    const validation = validateZipCode(zipCode);
+    const validation = validateZipCode(zipCode, country, state);
     setZipCodeError(validation.error);
   };
 
-  const handleCountryBlur = () => {
-    setTouched(prev => ({ ...prev, country: true }));
-    const validation = validateCountry(country);
-    setCountryError(validation.error);
+  const isAddressAlreadySaved = () => {
+    if (!userData?.me?.addresses || userData.me.addresses.length === 0) {
+      return false;
+    }
+
+    const enteredAddress = {
+      street: street.trim().toLowerCase(),
+      city: city.trim().toLowerCase(),
+      state: state.trim().toLowerCase(),
+      zipCode: zipCode.trim().toLowerCase(),
+      country: country.trim().toLowerCase(),
+    };
+
+    return userData.me.addresses.some(addr => 
+      addr.street.trim().toLowerCase() === enteredAddress.street &&
+      addr.city.trim().toLowerCase() === enteredAddress.city &&
+      addr.state.trim().toLowerCase() === enteredAddress.state &&
+      addr.zipCode.trim().toLowerCase() === enteredAddress.zipCode &&
+      addr.country.trim().toLowerCase() === enteredAddress.country
+    );
   };
 
-  // CHANGE: Enhanced validation before submission
   const handleCheckout = () => {
-    // CHANGE: Mark all fields as touched
     setTouched({
       street: true,
       city: true,
@@ -237,11 +255,10 @@ const CheckoutScreen = ({ navigation }) => {
       country: true,
     });
 
-    // CHANGE: Validate all fields
     const streetValidation = validateStreet(street);
     const cityValidation = validateCity(city);
     const stateValidation = validateState(state);
-    const zipCodeValidation = validateZipCode(zipCode);
+    const zipCodeValidation = validateZipCode(zipCode, country, state);
     const countryValidation = validateCountry(country);
 
     setStreetError(streetValidation.error);
@@ -250,7 +267,6 @@ const CheckoutScreen = ({ navigation }) => {
     setZipCodeError(zipCodeValidation.error);
     setCountryError(countryValidation.error);
 
-    // CHANGE: Stop if validation fails
     if (
       !streetValidation.isValid ||
       !cityValidation.isValid ||
@@ -262,6 +278,17 @@ const CheckoutScreen = ({ navigation }) => {
       return;
     }
 
+    const isNewAddress = !isAddressAlreadySaved();
+
+    if (isNewAddress) {
+      setShowSaveAddressModal(true);
+      setPendingCheckout(true);
+    } else {
+      proceedToCheckout();
+    }
+  };
+
+  const proceedToCheckout = () => {
     checkout({
       variables: {
         shippingAddress: {
@@ -275,12 +302,42 @@ const CheckoutScreen = ({ navigation }) => {
     });
   };
 
-  // CHANGE: Check if form is valid
+  const saveAddressAndCheckout = async () => {
+    try {
+      await addAddress({
+        variables: {
+          address: {
+            street: street.trim(),
+            city: city.trim(),
+            state: state.trim(),
+            zipCode: zipCode.trim(),
+            country: country.trim(),
+            isDefault: false,
+          },
+        },
+      });
+
+      setShowSaveAddressModal(false);
+      setPendingCheckout(false);
+      proceedToCheckout();
+    } catch (error) {
+      Alert.alert('Error', `Failed to save address: ${error.message}`);
+      setShowSaveAddressModal(false);
+      setPendingCheckout(false);
+    }
+  };
+
+  const checkoutWithoutSaving = () => {
+    setShowSaveAddressModal(false);
+    setPendingCheckout(false);
+    proceedToCheckout();
+  };
+
   const isFormValid = () => {
     const streetValidation = validateStreet(street);
     const cityValidation = validateCity(city);
     const stateValidation = validateState(state);
-    const zipCodeValidation = validateZipCode(zipCode);
+    const zipCodeValidation = validateZipCode(zipCode, country, state);
     const countryValidation = validateCountry(country);
 
     return (
@@ -301,6 +358,21 @@ const CheckoutScreen = ({ navigation }) => {
   }
 
   const cart = data?.myCart;
+
+  const countryItems = [
+    { label: 'India', value: 'India' },
+    { label: 'United States', value: 'United States' },
+  ];
+
+  const stateItems = availableStates.map(stateName => ({
+    label: stateName,
+    value: stateName,
+  }));
+
+  const cityItems = availableCities.map(cityName => ({
+    label: cityName,
+    value: cityName,
+  }));
 
   return (
     <ScrollView style={styles.container}>
@@ -345,10 +417,46 @@ const CheckoutScreen = ({ navigation }) => {
 
       <Text style={styles.sectionTitle}>Shipping Address</Text>
 
+      <CustomDropdown
+        label="Country"
+        value={country}
+        onValueChange={handleCountryChange}
+        items={countryItems}
+        placeholder="Select Country"
+        error={countryError}
+        touched={touched.country}
+        icon="public"
+      />
+
+      <CustomDropdown
+        label="State"
+        value={state}
+        onValueChange={handleStateChange}
+        items={stateItems}
+        placeholder={availableStates.length > 0 ? "Select State" : "Select Country First"}
+        error={stateError}
+        touched={touched.state}
+        enabled={availableStates.length > 0}
+        icon="location-city"
+      />
+
+      <CustomDropdown
+        label="City"
+        value={city}
+        onValueChange={handleCityChange}
+        items={cityItems}
+        placeholder={availableCities.length > 0 ? "Select City" : "Select State First"}
+        error={cityError}
+        touched={touched.city}
+        enabled={availableCities.length > 0}
+        icon="location-on"
+      />
+
       <View style={styles.inputContainer}>
+        <Text style={styles.label}>Street Address</Text>
         <TextInput
           style={[styles.input, streetError && touched.street && styles.inputError]}
-          placeholder="Street Address"
+          placeholder="Enter your street address"
           value={street}
           onChangeText={handleStreetChange}
           onBlur={handleStreetBlur}
@@ -359,55 +467,17 @@ const CheckoutScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.inputContainer}>
+        <Text style={styles.label}>{country === 'India' ? 'PIN Code' : 'ZIP Code'}</Text>
         <TextInput
-          style={[styles.input, cityError && touched.city && styles.inputError]}
-          placeholder="City"
-          value={city}
-          onChangeText={handleCityChange}
-          onBlur={handleCityBlur}
+          style={[styles.input, zipCodeError && touched.zipCode && styles.inputError]}
+          placeholder={country === 'India' ? 'Enter PIN Code' : 'Enter ZIP Code'}
+          value={zipCode}
+          onChangeText={handleZipCodeChange}
+          onBlur={handleZipCodeBlur}
+          keyboardType="default"
         />
-        {cityError && touched.city && (
-          <Text style={styles.errorText}>{cityError}</Text>
-        )}
-      </View>
-
-      <View style={styles.row}>
-        <View style={[styles.inputContainer, styles.halfInput]}>
-          <TextInput
-            style={[styles.input, stateError && touched.state && styles.inputError]}
-            placeholder="State"
-            value={state}
-            onChangeText={handleStateChange}
-            onBlur={handleStateBlur}
-          />
-          {stateError && touched.state && (
-            <Text style={styles.errorText}>{stateError}</Text>
-          )}
-        </View>
-        <View style={[styles.inputContainer, styles.halfInput]}>
-          <TextInput
-            style={[styles.input, zipCodeError && touched.zipCode && styles.inputError]}
-            placeholder="ZIP Code"
-            value={zipCode}
-            onChangeText={handleZipCodeChange}
-            onBlur={handleZipCodeBlur}
-          />
-          {zipCodeError && touched.zipCode && (
-            <Text style={styles.errorText}>{zipCodeError}</Text>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={[styles.input, countryError && touched.country && styles.inputError]}
-          placeholder="Country"
-          value={country}
-          onChangeText={handleCountryChange}
-          onBlur={handleCountryBlur}
-        />
-        {countryError && touched.country && (
-          <Text style={styles.errorText}>{countryError}</Text>
+        {zipCodeError && touched.zipCode && (
+          <Text style={styles.errorText}>{zipCodeError}</Text>
         )}
       </View>
 
@@ -440,6 +510,63 @@ const CheckoutScreen = ({ navigation }) => {
           <Text style={styles.placeOrderText}>Place Order</Text>
         )}
       </TouchableOpacity>
+
+      <Modal
+        visible={showSaveAddressModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowSaveAddressModal(false);
+          setPendingCheckout(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <MaterialIcons name="location-on" size={32} color="#2563EB" />
+              <Text style={styles.modalTitle}>Save This Address?</Text>
+            </View>
+            
+            <Text style={styles.modalMessage}>
+              Would you like to save this address for future orders?
+            </Text>
+
+            <View style={styles.addressPreview}>
+              <Text style={styles.previewText}>{street}</Text>
+              <Text style={styles.previewText}>
+                {city}, {state} {zipCode}
+              </Text>
+              <Text style={styles.previewText}>{country}</Text>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonSecondary}
+                onPress={checkoutWithoutSaving}
+                disabled={checkoutLoading}
+              >
+                <Text style={styles.modalButtonSecondaryText}>
+                  No, Just Place Order
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalButtonPrimary}
+                onPress={saveAddressAndCheckout}
+                disabled={checkoutLoading}
+              >
+                {checkoutLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalButtonPrimaryText}>
+                    Yes, Save & Place Order
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -455,7 +582,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // CHANGE: Add header back button styling
   headerBackButton: {
     marginLeft: 15,
     padding: 5,
@@ -467,37 +593,35 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     marginTop: 10,
   },
-  // CHANGE: Add input container for error message spacing
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
   inputContainer: {
     marginBottom: 15,
   },
   input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E6E8EB',
-    borderRadius: 14,
-    padding: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 15,
     color: '#111827',
+    fontWeight: '500',
   },
-  // CHANGE: Add error state styling
   inputError: {
     borderColor: '#EF4444',
     borderWidth: 1.5,
   },
-  // CHANGE: Add error text styling
   errorText: {
     color: '#EF4444',
     fontSize: 12,
     marginTop: 5,
     marginLeft: 5,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  halfInput: {
-    flex: 1,
   },
   summaryCard: {
     backgroundColor: '#fff',
@@ -544,7 +668,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
-  // CHANGE: Add disabled button styling
   placeOrderButtonDisabled: {
     backgroundColor: '#AFC7FF',
     opacity: 0.7,
@@ -597,6 +720,83 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  addressPreview: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  previewText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 4,
+  },
+  modalButtons: {
+    gap: 12,
+  },
+  modalButtonPrimary: {
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  modalButtonPrimaryText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonSecondary: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  modalButtonSecondaryText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

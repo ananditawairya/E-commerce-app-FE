@@ -14,6 +14,7 @@ import {
 import { useQuery, useMutation } from '@apollo/client';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomDropdown from '../../atoms/CustomDropdown';
 import { ME } from '../../graphql/queries';
 import {
     ADD_ADDRESS,
@@ -21,6 +22,17 @@ import {
     REMOVE_ADDRESS,
     SET_DEFAULT_ADDRESS,
 } from '../../graphql/mutations';
+import {
+    validateStreet,
+    validateCity,
+    validateState,
+    validateZipCode,
+    validateCountry,
+} from '../../utils/validators';
+import {
+    getStatesForCountry,
+    getCitiesForState,
+} from '../../utils/locationData';
 
 const ProfileScreen = ({ navigation, onLogout }) => {
     const [token, setToken] = useState(null);
@@ -34,6 +46,22 @@ const ProfileScreen = ({ navigation, onLogout }) => {
         country: '',
         isDefault: false,
     });
+
+    const [streetError, setStreetError] = useState('');
+    const [cityError, setCityError] = useState('');
+    const [stateError, setStateError] = useState('');
+    const [zipCodeError, setZipCodeError] = useState('');
+    const [countryError, setCountryError] = useState('');
+    const [touched, setTouched] = useState({
+        street: false,
+        city: false,
+        state: false,
+        zipCode: false,
+        country: false,
+    });
+
+    const availableStates = addressForm.country ? getStatesForCountry(addressForm.country) : [];
+    const availableCities = addressForm.country && addressForm.state ? getCitiesForState(addressForm.country, addressForm.state) : [];
 
     React.useEffect(() => {
         const getToken = async () => {
@@ -72,10 +100,87 @@ const ProfileScreen = ({ navigation, onLogout }) => {
         ]);
     };
 
+    const handleStreetChange = (text) => {
+        setAddressForm({ ...addressForm, street: text });
+        if (touched.street) {
+            const validation = validateStreet(text);
+            setStreetError(validation.error);
+        }
+    };
+
+    const handleCountryChange = (value) => {
+        setAddressForm({ ...addressForm, country: value, state: '', city: '', zipCode: '' });
+        if (touched.country) {
+            const validation = validateCountry(value);
+            setCountryError(validation.error);
+        }
+    };
+
+    const handleStateChange = (value) => {
+        setAddressForm({ ...addressForm, state: value, city: '', zipCode: '' });
+        if (touched.state) {
+            const validation = validateState(value);
+            setStateError(validation.error);
+        }
+    };
+
+    const handleCityChange = (value) => {
+        setAddressForm({ ...addressForm, city: value });
+        if (touched.city) {
+            const validation = validateCity(value);
+            setCityError(validation.error);
+        }
+    };
+
+    const handleZipCodeChange = (text) => {
+        setAddressForm({ ...addressForm, zipCode: text });
+        if (touched.zipCode) {
+            const validation = validateZipCode(text, addressForm.country, addressForm.state);
+            setZipCodeError(validation.error);
+        }
+    };
+
+    const handleStreetBlur = () => {
+        setTouched(prev => ({ ...prev, street: true }));
+        const validation = validateStreet(addressForm.street);
+        setStreetError(validation.error);
+    };
+
+    const handleZipCodeBlur = () => {
+        setTouched(prev => ({ ...prev, zipCode: true }));
+        const validation = validateZipCode(addressForm.zipCode, addressForm.country, addressForm.state);
+        setZipCodeError(validation.error);
+    };
+
     const handleSaveAddress = async () => {
-        const { street, city, state, zipCode, country } = addressForm;
-        if (!street || !city || !state || !zipCode || !country) {
-            Alert.alert('Error', 'Please fill all fields');
+        setTouched({
+            street: true,
+            city: true,
+            state: true,
+            zipCode: true,
+            country: true,
+        });
+
+        const streetValidation = validateStreet(addressForm.street);
+        const cityValidation = validateCity(addressForm.city);
+        const stateValidation = validateState(addressForm.state);
+        const zipCodeValidation = validateZipCode(addressForm.zipCode, addressForm.country, addressForm.state);
+        const countryValidation = validateCountry(addressForm.country);
+
+        setStreetError(streetValidation.error);
+        setCityError(cityValidation.error);
+        setStateError(stateValidation.error);
+        setZipCodeError(zipCodeValidation.error);
+        setCountryError(countryValidation.error);
+
+        if (
+            !streetValidation.isValid ||
+            !cityValidation.isValid ||
+            !stateValidation.isValid ||
+            !zipCodeValidation.isValid ||
+            !countryValidation.isValid
+        ) {
+            Alert.alert('Validation Error', 'Please fix all errors before saving');
             return;
         }
 
@@ -104,6 +209,18 @@ const ProfileScreen = ({ navigation, onLogout }) => {
                 country: '',
                 isDefault: false,
             });
+            setTouched({
+                street: false,
+                city: false,
+                state: false,
+                zipCode: false,
+                country: false,
+            });
+            setStreetError('');
+            setCityError('');
+            setStateError('');
+            setZipCodeError('');
+            setCountryError('');
             refetch();
         } catch (err) {
             Alert.alert('Error', err.message);
@@ -120,6 +237,18 @@ const ProfileScreen = ({ navigation, onLogout }) => {
             country: address.country,
             isDefault: address.isDefault,
         });
+        setTouched({
+            street: false,
+            city: false,
+            state: false,
+            zipCode: false,
+            country: false,
+        });
+        setStreetError('');
+        setCityError('');
+        setStateError('');
+        setZipCodeError('');
+        setCountryError('');
         setIsAddressModalVisible(true);
     };
 
@@ -148,6 +277,22 @@ const ProfileScreen = ({ navigation, onLogout }) => {
         } catch (err) {
             Alert.alert('Error', err.message);
         }
+    };
+
+    const isAddressFormValid = () => {
+        const streetValidation = validateStreet(addressForm.street);
+        const cityValidation = validateCity(addressForm.city);
+        const stateValidation = validateState(addressForm.state);
+        const zipCodeValidation = validateZipCode(addressForm.zipCode, addressForm.country, addressForm.state);
+        const countryValidation = validateCountry(addressForm.country);
+
+        return (
+            streetValidation.isValid &&
+            cityValidation.isValid &&
+            stateValidation.isValid &&
+            zipCodeValidation.isValid &&
+            countryValidation.isValid
+        );
     };
 
     if (loading && !user) {
@@ -190,6 +335,18 @@ const ProfileScreen = ({ navigation, onLogout }) => {
                                 country: '',
                                 isDefault: false,
                             });
+                            setTouched({
+                                street: false,
+                                city: false,
+                                state: false,
+                                zipCode: false,
+                                country: false,
+                            });
+                            setStreetError('');
+                            setCityError('');
+                            setStateError('');
+                            setZipCodeError('');
+                            setCountryError('');
                             setIsAddressModalVisible(true);
                         }}
                     >
@@ -290,56 +447,77 @@ const ProfileScreen = ({ navigation, onLogout }) => {
                         </View>
 
                         <ScrollView style={styles.modalForm}>
+                            <CustomDropdown
+                                label="Country"
+                                value={addressForm.country}
+                                onValueChange={handleCountryChange}
+                                items={[
+                                    { label: 'India', value: 'India' },
+                                    { label: 'United States', value: 'United States' },
+                                ]}
+                                placeholder="Select Country"
+                                error={countryError}
+                                touched={touched.country}
+                                icon="public"
+                            />
+                            {countryError && touched.country && (
+                                <Text style={styles.errorText}>{countryError}</Text>
+                            )}
+
+                            <CustomDropdown
+                                label="State"
+                                value={addressForm.state}
+                                onValueChange={handleStateChange}
+                                items={availableStates.map(s => ({ label: s, value: s }))}
+                                placeholder={availableStates.length > 0 ? "Select State" : "Select Country First"}
+                                error={stateError}
+                                touched={touched.state}
+                                enabled={availableStates.length > 0}
+                                icon="location-city"
+                            />
+                            {stateError && touched.state && (
+                                <Text style={styles.errorText}>{stateError}</Text>
+                            )}
+
+                            <CustomDropdown
+                                label="City"
+                                value={addressForm.city}
+                                onValueChange={handleCityChange}
+                                items={availableCities.map(c => ({ label: c, value: c }))}
+                                placeholder={availableCities.length > 0 ? "Select City" : "Select State First"}
+                                error={cityError}
+                                touched={touched.city}
+                                enabled={availableCities.length > 0}
+                                icon="location-on"
+                            />
+                            {cityError && touched.city && (
+                                <Text style={styles.errorText}>{cityError}</Text>
+                            )}
+
                             <Text style={styles.label}>Street Address</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, streetError && touched.street && styles.inputError]}
                                 value={addressForm.street}
-                                onChangeText={(text) => setAddressForm({ ...addressForm, street: text })}
+                                onChangeText={handleStreetChange}
+                                onBlur={handleStreetBlur}
                                 placeholder="123 Main St"
                             />
+                            {streetError && touched.street && (
+                                <Text style={styles.errorText}>{streetError}</Text>
+                            )}
 
-                            <View style={styles.row}>
-                                <View style={styles.flex1}>
-                                    <Text style={styles.label}>City</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={addressForm.city}
-                                        onChangeText={(text) => setAddressForm({ ...addressForm, city: text })}
-                                        placeholder="New York"
-                                    />
-                                </View>
-                                <View style={[styles.flex1, { marginLeft: 12 }]}>
-                                    <Text style={styles.label}>State</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={addressForm.state}
-                                        onChangeText={(text) => setAddressForm({ ...addressForm, state: text })}
-                                        placeholder="NY"
-                                    />
-                                </View>
-                            </View>
-
-                            <View style={styles.row}>
-                                <View style={styles.flex1}>
-                                    <Text style={styles.label}>Zip Code</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={addressForm.zipCode}
-                                        onChangeText={(text) => setAddressForm({ ...addressForm, zipCode: text })}
-                                        placeholder="10001"
-                                        keyboardType="numeric"
-                                    />
-                                </View>
-                                <View style={[styles.flex1, { marginLeft: 12 }]}>
-                                    <Text style={styles.label}>Country</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={addressForm.country}
-                                        onChangeText={(text) => setAddressForm({ ...addressForm, country: text })}
-                                        placeholder="USA"
-                                    />
-                                </View>
-                            </View>
+                            <Text style={styles.label}>{addressForm.country === 'India' ? 'PIN Code' : 'ZIP Code'}</Text>
+                            <TextInput
+                                style={[styles.input, zipCodeError && touched.zipCode && styles.inputError]}
+                                value={addressForm.zipCode}
+                                onChangeText={handleZipCodeChange}
+                                onBlur={handleZipCodeBlur}
+                                placeholder={addressForm.country === 'India' ? '110001' : '10001'}
+                                keyboardType="default"
+                            />
+                            {zipCodeError && touched.zipCode && (
+                                <Text style={styles.errorText}>{zipCodeError}</Text>
+                            )}
 
                             <View style={styles.switchRow}>
                                 <Text style={styles.label}>Set as default address</Text>
@@ -351,7 +529,11 @@ const ProfileScreen = ({ navigation, onLogout }) => {
                                 />
                             </View>
 
-                            <TouchableOpacity style={styles.saveButton} onPress={handleSaveAddress}>
+                            <TouchableOpacity 
+                                style={[styles.saveButton, !isAddressFormValid() && styles.saveButtonDisabled]} 
+                                onPress={handleSaveAddress}
+                                disabled={!isAddressFormValid()}
+                            >
                                 <Text style={styles.saveButtonText}>Save Address</Text>
                             </TouchableOpacity>
                         </ScrollView>
@@ -554,11 +736,16 @@ const styles = StyleSheet.create({
         fontSize: 15,
         marginBottom: 16,
     },
-    row: {
-        flexDirection: 'row',
+    inputError: {
+        borderColor: '#EF4444',
+        borderWidth: 1.5,
     },
-    flex1: {
-        flex: 1,
+    errorText: {
+        color: '#EF4444',
+        fontSize: 12,
+        marginTop: -12,
+        marginBottom: 12,
+        marginLeft: 4,
     },
     switchRow: {
         flexDirection: 'row',
@@ -571,6 +758,10 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 16,
         alignItems: 'center',
+    },
+    saveButtonDisabled: {
+        backgroundColor: '#AFC7FF',
+        opacity: 0.7,
     },
     saveButtonText: {
         color: '#FFFFFF',

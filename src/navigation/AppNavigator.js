@@ -35,6 +35,7 @@ const BuyerTabs = ({ onLogout }) => {
           let iconName;
           if (route.name === 'Products') iconName = 'home';
           else if (route.name === 'Cart') iconName = 'shopping-cart';
+          else if (route.name==='Profile') iconName='person';
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#2563EB',
