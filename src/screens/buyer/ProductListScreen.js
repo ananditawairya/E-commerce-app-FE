@@ -96,6 +96,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const loadMoreInFlightRef = useRef(false);
+  const endReachedInMomentumRef = useRef(false);
 
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -107,6 +108,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   const [hasMore, setHasMore] = useState(true);
   const [nextLoadMoreAt, setNextLoadMoreAt] = useState(0);
   const [paginationNotice, setPaginationNotice] = useState('');
+  const [isPaginating, setPaginating] = useState(false);
   const [isSearchFocused, setSearchFocused] = useState(false);
 
   const [isSortModalVisible, setSortModalVisible] = useState(false);
@@ -240,7 +242,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   const products = data?.products || [];
   const suggestions = suggestionsData?.searchSuggestions || [];
   const isInitialLoading = loading && products.length === 0;
-  const isFetchingMore = networkStatus === NetworkStatus.fetchMore;
+  const isFetchingMore = isPaginating;
   const isRefreshing = networkStatus === NetworkStatus.refetch;
   const categoryOptions = [
     ALL_CATEGORIES_LABEL,
@@ -457,6 +459,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
 
     const offset = products.length;
     loadMoreInFlightRef.current = true;
+    setPaginating(true);
 
     try {
       setPaginationNotice('');
@@ -468,6 +471,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
         },
         updateQuery: (previousResult, { fetchMoreResult }) => {
           const nextProducts = fetchMoreResult?.products || [];
+          const previousProducts = previousResult?.products || [];
 
           if (!nextProducts.length) {
             setHasMore(false);
@@ -479,15 +483,25 @@ const ProductListScreen = ({ navigation, onLogout }) => {
           }
 
           const seen = new Set(
-            previousResult.products.map((item) => item.id)
+            previousProducts.map((item) => item.id)
           );
           const uniqueNextProducts = nextProducts.filter(
             (item) => !seen.has(item.id)
           );
 
+          // Prevent infinite load-more loop when backend returns only duplicates.
+          if (!uniqueNextProducts.length) {
+            setHasMore(false);
+            return previousResult;
+          }
+
+          if (uniqueNextProducts.length < PAGE_SIZE) {
+            setHasMore(false);
+          }
+
           return {
             ...previousResult,
-            products: [...previousResult.products, ...uniqueNextProducts],
+            products: [...previousProducts, ...uniqueNextProducts],
           };
         },
       });
@@ -502,6 +516,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
       console.error('Failed to load more products:', fetchError);
     } finally {
       loadMoreInFlightRef.current = false;
+      setPaginating(false);
     }
   }, [
     fetchMore,
@@ -513,11 +528,24 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     products.length,
   ]);
 
+  const handleEndReached = useCallback(() => {
+    if (endReachedInMomentumRef.current) {
+      return;
+    }
+    endReachedInMomentumRef.current = true;
+    loadMore();
+  }, [loadMore]);
+
+  const handleScrollStart = useCallback(() => {
+    endReachedInMomentumRef.current = false;
+  }, []);
+
   const handleRefresh = useCallback(async () => {
     try {
       setHasMore(true);
       setNextLoadMoreAt(0);
       setPaginationNotice('');
+      setPaginating(false);
       await refetch({
         ...productQueryVariables,
         offset: 0,
@@ -612,17 +640,19 @@ const ProductListScreen = ({ navigation, onLogout }) => {
             onRefresh={handleRefresh}
             refreshing={isRefreshing}
             ListHeaderComponent={listHeaderComponent}
-            onEndReached={loadMore}
+            onEndReached={handleEndReached}
             onEndReachedThreshold={0.35}
+            onScrollBeginDrag={handleScrollStart}
+            onMomentumScrollBegin={handleScrollStart}
             initialNumToRender={6}
             maxToRenderPerBatch={8}
             windowSize={7}
             updateCellsBatchingPeriod={50}
             removeClippedSubviews
             ListFooterComponent={
-              isFetchingMore || paginationNotice ? (
+              (hasMore && isFetchingMore) || paginationNotice ? (
                 <View style={styles.footerLoader}>
-                  {isFetchingMore ? (
+                  {hasMore && isFetchingMore ? (
                     <ActivityIndicator size="small" color="#1D4ED8" />
                   ) : (
                     <Text style={styles.footerNoticeText}>{paginationNotice}</Text>
