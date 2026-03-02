@@ -15,6 +15,9 @@ import { GET_MY_ORDERS } from '../../graphql/queries';
 const OrderHistoryScreen = ({ navigation }) => {
     const { data, loading, error, refetch } = useQuery(GET_MY_ORDERS, {
         notifyOnNetworkStatusChange: true,
+        fetchPolicy: 'network-only',
+        nextFetchPolicy: 'network-only',
+        pollInterval: 5000,
     });
 
     const orders = data?.myOrders || [];
@@ -34,13 +37,22 @@ const OrderHistoryScreen = ({ navigation }) => {
         }
     };
 
-    const renderOrderItem = ({ item }) => (
-        <View style={styles.orderCard}>
+    const renderOrderItem = ({ item }) => {
+        const createdAtNumeric = Number(item.createdAt);
+        const createdAt = Number.isNaN(createdAtNumeric)
+            ? new Date(item.createdAt)
+            : new Date(createdAtNumeric);
+        const createdAtLabel = Number.isNaN(createdAt.getTime())
+            ? 'Date unavailable'
+            : createdAt.toLocaleDateString();
+
+        return (
+            <View style={styles.orderCard}>
             <View style={styles.orderHeader}>
                 <View>
                     <Text style={styles.orderId}>Order #{item.orderId.substring(0, 8)}</Text>
                     <Text style={styles.orderDate}>
-                        {new Date(parseInt(item.createdAt)).toLocaleDateString()}
+                        {createdAtLabel}
                     </Text>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '15' }]}>
@@ -86,7 +98,8 @@ const OrderHistoryScreen = ({ navigation }) => {
                 </TouchableOpacity>
             </View>
         </View>
-    );
+        );
+    };
 
     return (
         <View style={styles.container}>

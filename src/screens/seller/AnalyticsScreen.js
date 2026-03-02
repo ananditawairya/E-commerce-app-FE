@@ -19,9 +19,12 @@ const formatCurrency = (value) => {
 const AnalyticsScreen = () => {
   const [days, setDays] = useState(7);
 
-  const { data, loading, refetch } = useQuery(GET_SELLER_ANALYTICS, {
+  const { data, loading, error, refetch } = useQuery(GET_SELLER_ANALYTICS, {
     variables: { days },
-    fetchPolicy: 'cache-and-network',
+    fetchPolicy: 'network-only',
+    nextFetchPolicy: 'network-only',
+    pollInterval: 5000,
+    notifyOnNetworkStatusChange: true,
   });
 
   const analytics = data?.sellerAnalytics;
@@ -59,6 +62,17 @@ const AnalyticsScreen = () => {
       {loading && !analytics ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color="#2563EB" />
+        </View>
+      ) : error ? (
+        <View style={styles.loading}>
+          <Text style={styles.errorText}>Failed to load analytics</Text>
+          <Text style={styles.errorDetails}>{error.message}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => refetch({ days })}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>
@@ -175,6 +189,30 @@ const styles = StyleSheet.create({
   loading: {
     marginTop: 40,
     alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  errorDetails: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  retryButton: {
+    marginTop: 12,
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   statGrid: {
     flexDirection: 'row',

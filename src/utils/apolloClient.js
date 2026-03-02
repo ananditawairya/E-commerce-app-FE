@@ -127,26 +127,26 @@ const retryLink = new RetryLink({
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors) {
     graphQLErrors.forEach(({ message, locations, path, extensions }) => {
-      console.error(
+      console.warn(
         `GraphQL error: Message: ${message}, Location: ${locations}, Path: ${path}`
       );
       if (extensions) {
-        console.error('Error extensions:', extensions);
+        console.warn('Error extensions:', extensions);
       }
     });
   }
 
   if (networkError) {
-    console.error(`Network error: ${networkError}`);
+    console.warn(`Network error: ${networkError}`);
     if (networkError.statusCode) {
-      console.error(`Status Code: ${networkError.statusCode}`);
+      console.warn(`Status Code: ${networkError.statusCode}`);
     }
     if (networkError.result) {
-      console.error(`Network Error Result:`, networkError.result);
+      console.warn(`Network Error Result:`, networkError.result);
     }
 
     if (networkError.statusCode === 429) {
-      console.error('❌ Rate limit exceeded');
+      console.warn('⚠️ Rate limit exceeded');
     }
 
     // Token expired or invalid — attempt refresh

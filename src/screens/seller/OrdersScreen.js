@@ -14,7 +14,7 @@ import { UPDATE_ORDER_STATUS, CANCEL_ORDER } from '../../graphql/mutations';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const OrdersScreen = () => {
-  const { data, loading, refetch } = useQuery(GET_SELLER_ORDERS);
+  const { data, loading, error, refetch } = useQuery(GET_SELLER_ORDERS);
 
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, {
     refetchQueries: [{ query: GET_SELLER_ORDERS }],
@@ -81,6 +81,13 @@ const OrdersScreen = () => {
 
   const renderOrder = ({ item }) => {
     const myItems = item.items.filter((i) => i.sellerId);
+    const createdAtValue = Number(item.createdAt);
+    const createdAt = Number.isNaN(createdAtValue)
+      ? new Date(item.createdAt)
+      : new Date(createdAtValue);
+    const createdAtLabel = Number.isNaN(createdAt.getTime())
+      ? 'Date unavailable'
+      : createdAt.toLocaleDateString();
 
     return (
       <View style={styles.orderCard}>
@@ -91,9 +98,7 @@ const OrdersScreen = () => {
           </Text>
         </View>
 
-        <Text style={styles.orderDate}>
-          {new Date(parseInt(item.createdAt)).toLocaleDateString()}
-        </Text>
+        <Text style={styles.orderDate}>{createdAtLabel}</Text>
 
         {myItems.map((orderItem, index) => (
           <View key={index} style={styles.orderItem}>
@@ -138,6 +143,15 @@ const OrdersScreen = () => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : error ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="error-outline" size={50} color="#EF4444" />
+          <Text style={styles.emptyText}>Failed to load seller orders</Text>
+          <Text style={styles.errorText}>{error.message}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -302,6 +316,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#9CA3AF',
     marginTop: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 6,
+    color: '#6B7280',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  retryButton: {
+    marginTop: 12,
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

@@ -16,9 +16,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 // CHANGE: Accept onLogout prop from parent component
 const SellerProductsScreen = ({ navigation, onLogout }) => {
-  const { data, loading, refetch } = useQuery(GET_SELLER_PRODUCTS, {
+  const { data, loading, error, refetch } = useQuery(GET_SELLER_PRODUCTS, {
   // CHANGE: Always fetch fresh data from network
   fetchPolicy: 'network-only',
+  errorPolicy: 'none',
+  notifyOnNetworkStatusChange: true,
   // CHANGE: Poll every 5 seconds to catch stock updates from order cancellations
   pollInterval: 5000,
 });
@@ -117,6 +119,15 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : error ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="error-outline" size={50} color="#EF4444" />
+          <Text style={styles.emptyText}>Failed to load products</Text>
+          <Text style={styles.errorText}>{error.message}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -235,6 +246,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#9CA3AF',
     marginTop: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 6,
+    color: '#6B7280',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  retryButton: {
+    marginTop: 12,
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',

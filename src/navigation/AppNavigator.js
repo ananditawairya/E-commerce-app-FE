@@ -23,6 +23,7 @@ import AddProductScreen from '../screens/seller/AddProductScreen';
 import OrdersScreen from '../screens/seller/OrdersScreen';
 import AnalyticsScreen from '../screens/seller/AnalyticsScreen';
 import { API_BASE_URL } from '../config/api';
+import apolloClient from '../utils/apolloClient';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -112,6 +113,27 @@ const AppNavigator = () => {
     checkAuth();
   }, []);
 
+  const resolveRoleFromToken = async (token) => {
+    const response = await fetch(`${API_BASE_URL}/graphql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        query: `query MeFromToken($token: String!) { me(token: $token) { id role } }`,
+        variables: { token },
+      }),
+    });
+
+    const result = await response.json();
+    if (result.errors || !result.data?.me?.role) {
+      throw new Error(result.errors?.[0]?.message || 'Unable to resolve role');
+    }
+
+    return result.data.me.role;
+  };
+
   // Attempt to refresh the access token using the stored refresh token
   const tryRefreshToken = async () => {
     try {
@@ -147,51 +169,48 @@ const AppNavigator = () => {
   const checkAuth = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const role = await AsyncStorage.getItem('userRole');
+      const storedRole = await AsyncStorage.getItem('userRole');
 
-      if (token && role) {
+      if (token && storedRole) {
         // Validate token before setting authenticated state
         try {
-          const response = await fetch(`${API_BASE_URL}/graphql`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              query: `query { me(token: "${token}") { id } }`,
-            }),
-          });
-
-          const result = await response.json();
-
-          if (result.errors || !result.data?.me) {
-            // Token invalid — attempt refresh before logging out
-            console.log('⚠️ Access token expired, attempting refresh...');
-            const refreshed = await tryRefreshToken();
-            if (refreshed) {
-              setIsAuthenticated(true);
-              setUserRole(role);
-            } else {
-              await AsyncStorage.clear();
-              console.log('⚠️ Refresh failed — user must re-login');
-            }
-            return;
-          }
-
-          // Token valid — proceed with authenticated state
+          const resolvedRole = await resolveRoleFromToken(token);
+          await AsyncStorage.setItem('userRole', resolvedRole);
           setIsAuthenticated(true);
-          setUserRole(role);
-        } catch (validationError) {
-          // Network error during validation — try refresh
-          console.log('Token validation error:', validationError);
+          setUserRole(resolvedRole);
+        } catch (firstError) {
+          // Token invalid — attempt refresh before logging out
+          console.log('⚠️ Access token expired or invalid, attempting refresh...');
           const refreshed = await tryRefreshToken();
           if (refreshed) {
-            setIsAuthenticated(true);
-            setUserRole(role);
+            try {
+              const newToken = await AsyncStorage.getItem('accessToken');
+              if (!newToken) {
+                throw new Error('Missing access token after refresh');
+              }
+              const refreshedRole = await resolveRoleFromToken(newToken);
+              await AsyncStorage.setItem('userRole', refreshedRole);
+              setIsAuthenticated(true);
+              setUserRole(refreshedRole);
+            } catch (refreshResolveError) {
+              await AsyncStorage.clear();
+              console.log('⚠️ Role resolution failed after refresh:', refreshResolveError.message);
+            }
           } else {
             await AsyncStorage.clear();
+            console.log('⚠️ Refresh failed — user must re-login');
           }
+        }
+      } else if (token) {
+        // Role missing in storage, recover from token.
+        try {
+          const resolvedRole = await resolveRoleFromToken(token);
+          await AsyncStorage.setItem('userRole', resolvedRole);
+          setIsAuthenticated(true);
+          setUserRole(resolvedRole);
+        } catch (error) {
+          await AsyncStorage.clear();
+          console.log('⚠️ Failed to recover role from token:', error.message);
         }
       }
     } catch (error) {
@@ -205,14 +224,38 @@ const AppNavigator = () => {
   const handleAuthSuccess = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const role = await AsyncStorage.getItem('userRole');
 
-      if (token && role) {
+      if (token) {
+        const resolvedRole = await resolveRoleFromToken(token);
+        await AsyncStorage.setItem('userRole', resolvedRole);
+        await apolloClient.clearStore();
         setIsAuthenticated(true);
-        setUserRole(role);
+        setUserRole(resolvedRole);
+      } else {
+        await AsyncStorage.clear();
       }
     } catch (error) {
       console.log('Auth success error:', error);
+      try {
+        const refreshed = await tryRefreshToken();
+        if (refreshed) {
+          const newToken = await AsyncStorage.getItem('accessToken');
+          if (!newToken) {
+            throw new Error('Missing refreshed token');
+          }
+          const resolvedRole = await resolveRoleFromToken(newToken);
+          await AsyncStorage.setItem('userRole', resolvedRole);
+          await apolloClient.clearStore();
+          setIsAuthenticated(true);
+          setUserRole(resolvedRole);
+          return;
+        }
+      } catch (refreshError) {
+        console.log('Auth success recovery failed:', refreshError.message);
+      }
+      await AsyncStorage.clear();
+      setIsAuthenticated(false);
+      setUserRole(null);
     }
   };
 
@@ -220,6 +263,7 @@ const AppNavigator = () => {
   const handleLogout = async () => {
     try {
       await AsyncStorage.clear();
+      await apolloClient.clearStore();
       setIsAuthenticated(false);
       setUserRole(null);
       // CHANGE: Don't use navigation.reset here - let state change trigger re-render
