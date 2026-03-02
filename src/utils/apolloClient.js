@@ -148,16 +148,11 @@ const retryLink = new RetryLink({
         error?.networkError?.statusCode === 429;
       const isNetworkError = !!error?.networkError && !error?.result;
 
-      const isAuthOperation =
-        operation.operationName === 'Login' ||
-        operation.operationName === 'Register';
-
-      if (isAuthOperation && is429) {
-        console.warn('⚠️ Rate limit hit on auth operation - not retrying');
+      if (is429) {
         return false;
       }
 
-      return is429 || isNetworkError;
+      return isNetworkError;
     },
   },
 });

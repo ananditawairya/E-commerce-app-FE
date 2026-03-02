@@ -200,6 +200,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
+  footerNoticeText: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',

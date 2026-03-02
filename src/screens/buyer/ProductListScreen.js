@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -60,6 +60,30 @@ function enrichProducts(recommendations, products) {
 }
 
 /**
+ * Extracts best-effort HTTP status from Apollo/network error.
+ * @param {unknown} error Apollo error object.
+ * @return {number|null} HTTP status code if available.
+ */
+function getStatusCode(error) {
+  const directStatus = error?.statusCode;
+  if (Number.isFinite(directStatus)) {
+    return directStatus;
+  }
+
+  const networkStatus = error?.networkError?.statusCode;
+  if (Number.isFinite(networkStatus)) {
+    return networkStatus;
+  }
+
+  const responseStatus = error?.networkError?.response?.status;
+  if (Number.isFinite(responseStatus)) {
+    return responseStatus;
+  }
+
+  return null;
+}
+
+/**
  * Product catalog screen with search, filters, and recommendations.
  * @param {{
  *   navigation: object,
@@ -68,8 +92,10 @@ function enrichProducts(recommendations, products) {
  * @return {React.JSX.Element} Product list screen UI.
  */
 const ProductListScreen = ({ navigation, onLogout }) => {
+  const PAGINATION_RATE_LIMIT_COOLDOWN_MS = 20_000;
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+  const loadMoreInFlightRef = useRef(false);
 
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -79,6 +105,8 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   const [inStockOnly, setInStockOnly] = useState(false);
   const [userId, setUserId] = useState(null);
   const [hasMore, setHasMore] = useState(true);
+  const [nextLoadMoreAt, setNextLoadMoreAt] = useState(0);
+  const [paginationNotice, setPaginationNotice] = useState('');
   const [isSearchFocused, setSearchFocused] = useState(false);
 
   const [isSortModalVisible, setSortModalVisible] = useState(false);
@@ -106,6 +134,8 @@ const ProductListScreen = ({ navigation, onLogout }) => {
 
   React.useEffect(() => {
     setHasMore(true);
+    setNextLoadMoreAt(0);
+    setPaginationNotice('');
   }, [
     debouncedSearch,
     selectedCategories,
@@ -411,13 +441,25 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   }, [navigation]);
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || isFetchingMore || isInitialLoading || products.length === 0) {
+    if (
+      !hasMore
+      || isFetchingMore
+      || isInitialLoading
+      || products.length === 0
+      || loadMoreInFlightRef.current
+    ) {
+      return;
+    }
+
+    if (Date.now() < nextLoadMoreAt) {
       return;
     }
 
     const offset = products.length;
+    loadMoreInFlightRef.current = true;
 
     try {
+      setPaginationNotice('');
       await fetchMore({
         variables: {
           ...productQueryVariables,
@@ -450,13 +492,23 @@ const ProductListScreen = ({ navigation, onLogout }) => {
         },
       });
     } catch (fetchError) {
+      const statusCode = getStatusCode(fetchError);
+      if (statusCode === 429) {
+        setNextLoadMoreAt(Date.now() + PAGINATION_RATE_LIMIT_COOLDOWN_MS);
+        setPaginationNotice('Rate limit reached. Pausing auto-load briefly.');
+      } else {
+        setPaginationNotice('Unable to load more products right now.');
+      }
       console.error('Failed to load more products:', fetchError);
+    } finally {
+      loadMoreInFlightRef.current = false;
     }
   }, [
     fetchMore,
     hasMore,
     isFetchingMore,
     isInitialLoading,
+    nextLoadMoreAt,
     productQueryVariables,
     products.length,
   ]);
@@ -464,6 +516,8 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   const handleRefresh = useCallback(async () => {
     try {
       setHasMore(true);
+      setNextLoadMoreAt(0);
+      setPaginationNotice('');
       await refetch({
         ...productQueryVariables,
         offset: 0,
@@ -566,9 +620,13 @@ const ProductListScreen = ({ navigation, onLogout }) => {
             updateCellsBatchingPeriod={50}
             removeClippedSubviews
             ListFooterComponent={
-              isFetchingMore ? (
+              isFetchingMore || paginationNotice ? (
                 <View style={styles.footerLoader}>
-                  <ActivityIndicator size="small" color="#1D4ED8" />
+                  {isFetchingMore ? (
+                    <ActivityIndicator size="small" color="#1D4ED8" />
+                  ) : (
+                    <Text style={styles.footerNoticeText}>{paginationNotice}</Text>
+                  )}
                 </View>
               ) : null
             }
