@@ -1,5 +1,6 @@
 import React from 'react';
 import { ApolloProvider } from '@apollo/client';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import client from './src/utils/apolloClient';
 import AppNavigator from './src/navigation/AppNavigator';
 
@@ -9,9 +10,11 @@ import AppNavigator from './src/navigation/AppNavigator';
  */
 const App = () => {
   return (
-    <ApolloProvider client={client}>
-      <AppNavigator />
-    </ApolloProvider>
+    <SafeAreaProvider>
+      <ApolloProvider client={client}>
+        <AppNavigator />
+      </ApolloProvider>
+    </SafeAreaProvider>
   );
 };
 

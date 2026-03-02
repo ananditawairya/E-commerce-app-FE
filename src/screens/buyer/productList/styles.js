@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import theme from '../../../theme/theme';
 
 /**
  * Style definitions for the buyer product list screen.
@@ -6,26 +7,26 @@ import { StyleSheet } from 'react-native';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 58,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.lg,
     paddingBottom: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.background,
   },
   headerTitle: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '800',
-    color: '#0F172A',
+    color: theme.colors.textPrimary,
     letterSpacing: -0.8,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: '#475569',
+    color: theme.colors.textSecondary,
     marginTop: 2,
     fontWeight: '500',
   },
@@ -33,7 +34,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -42,9 +43,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 20,
     marginBottom: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 16,
     paddingHorizontal: 14,
   },
@@ -54,7 +55,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 46,
-    color: '#0F172A',
+    color: theme.colors.textPrimary,
     fontSize: 15,
     fontWeight: '500',
   },
@@ -67,9 +68,9 @@ const styles = StyleSheet.create({
   toolbarButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 9,
@@ -81,12 +82,12 @@ const styles = StyleSheet.create({
   },
   toolbarButtonText: {
     marginLeft: 6,
-    color: '#1E293B',
+    color: theme.colors.textPrimary,
     fontWeight: '700',
     fontSize: 13,
   },
   toolbarButtonTextHighlighted: {
-    color: '#1D4ED8',
+    color: theme.colors.primary,
   },
   toolbarClearButton: {
     marginLeft: 'auto',
@@ -94,7 +95,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   toolbarClearText: {
-    color: '#1D4ED8',
+    color: theme.colors.primary,
     fontWeight: '700',
     fontSize: 13,
   },
@@ -119,12 +120,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0F172A',
+    color: theme.colors.textPrimary,
     letterSpacing: -0.3,
   },
   resultsCount: {
     fontSize: 13,
-    color: '#64748B',
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -136,13 +137,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#334155',
+    color: theme.colors.textPrimary,
     marginTop: 14,
     textAlign: 'center',
   },
   emptyText: {
     marginTop: 8,
-    color: '#64748B',
+    color: theme.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -162,23 +163,23 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 18,
     fontWeight: '700',
-    color: '#991B1B',
+    color: theme.colors.danger,
   },
   errorMessage: {
     marginTop: 6,
     fontSize: 14,
-    color: '#64748B',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 14,
   },
   retryButton: {
-    backgroundColor: '#1D4ED8',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     paddingHorizontal: 18,
     paddingVertical: 11,
   },
   retryButtonText: {
-    color: '#FFFFFF',
+    color: theme.colors.surface,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -192,31 +193,31 @@ const styles = StyleSheet.create({
   },
   skeletonCard: {
     width: '48%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     padding: 10,
     marginBottom: 12,
   },
   skeletonImage: {
     height: 120,
     borderRadius: 10,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.surfaceMuted,
     marginBottom: 10,
   },
   skeletonLineLong: {
     height: 12,
     borderRadius: 8,
     width: '92%',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.surfaceMuted,
     marginBottom: 8,
   },
   skeletonLineShort: {
     height: 10,
     borderRadius: 8,
     width: '58%',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.surfaceMuted,
     marginBottom: 8,
   },
   skeletonLineMedium: {

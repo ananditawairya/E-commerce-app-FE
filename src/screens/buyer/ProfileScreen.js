@@ -10,6 +10,8 @@ import {
 import { useMutation, useQuery } from '@apollo/client';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ME } from '../../graphql/queries';
 import {
@@ -31,6 +33,7 @@ import {
 } from '../../utils/locationData';
 import AddressFormModal from './profile/components/AddressFormModal';
 import styles from './profile/styles';
+import theme from '../../theme/theme';
 
 const INITIAL_ADDRESS_FORM = {
   street: '',
@@ -63,6 +66,8 @@ const COUNTRY_ITEMS = [
  * @return {React.JSX.Element} Profile UI.
  */
 const ProfileScreen = ({ navigation, onLogout }) => {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const [token, setToken] = useState(null);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
@@ -401,14 +406,21 @@ const ProfileScreen = ({ navigation, onLogout }) => {
 
   if (loading && !user) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
-      </View>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + insets.bottom + 16 }}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <View style={styles.profileInfo}>
           <View style={styles.avatarContainer}>
@@ -540,7 +552,8 @@ const ProfileScreen = ({ navigation, onLogout }) => {
         onSave={handleSaveAddress}
         isSaveDisabled={!isAddressFormValid()}
       />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

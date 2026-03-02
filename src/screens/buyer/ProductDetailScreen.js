@@ -14,7 +14,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ADD_TO_CART, TRACK_EVENT } from '../../graphql/mutations';
 import { GET_MY_CART, GET_SIMILAR_PRODUCTS, GET_PRODUCTS } from '../../graphql/queries';
 import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ProductHorizontalList from '../../components/ProductHorizontalList';
+import theme from '../../theme/theme';
+
+/**
+ * Formats a numeric price as currency.
+ * @param {number} value Price value.
+ * @return {string} Formatted price.
+ */
+const formatCurrency = (value) => {
+  if (!Number.isFinite(value)) {
+    return '$0.00';
+  }
+  return `$${value.toFixed(2)}`;
+};
 
 /**
  * Product detail screen.
@@ -22,6 +36,7 @@ import ProductHorizontalList from '../../components/ProductHorizontalList';
  * @return {React.JSX.Element} Product detail UI.
  */
 const ProductDetailScreen = ({ route, navigation }) => {
+  const insets = useSafeAreaInsets();
   const { product } = route.params;
   const [selectedVariant, setSelectedVariant] = useState(
     product.variants && product.variants.length > 0 ? product.variants[0] : null
@@ -29,6 +44,21 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [userId, setUserId] = useState(null);
+
+  /**
+   * Navigates back when possible, otherwise routes to buyer products tab.
+   * @return {void} No return value.
+   */
+  const navigateBackOrHome = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.navigate('BuyerHome', {
+      screen: 'Products',
+    });
+  };
 
   const { data: allProductsData } = useQuery(GET_PRODUCTS, {
     variables: { limit: 100 },
@@ -73,25 +103,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
-      headerShown: true,
-      title: 'Product Details',
-      headerLeft: () => (
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.headerBackButton}
-          accessibilityLabel="Go back to products"
-        >
-          <MaterialIcons name="arrow-back" size={24} color="#2563EB" />
-        </TouchableOpacity>
-      ),
-      headerStyle: {
-        backgroundColor: '#F7F7F8',
-      },
-      headerTitleStyle: {
-        color: '#111827',
-        fontSize: 18,
-        fontWeight: '700',
-      },
+      headerShown: false,
     });
   }, [navigation]);
 
@@ -99,7 +111,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
     refetchQueries: [{ query: GET_MY_CART }],
     onCompleted: () => {
       Alert.alert('Success', 'Product added to cart!');
-      navigation.goBack();
+      navigateBackOrHome();
     },
     onError: async (error) => {
       console.error('Add to cart error:', error);
@@ -250,38 +262,74 @@ const ProductDetailScreen = ({ route, navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {product.images && product.images.length > 0 ? (
-        <View>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 24 },
+        ]}
+      >
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          onPress={navigateBackOrHome}
+          style={styles.topBarBackButton}
+          accessibilityLabel="Go back to products"
+        >
+          <MaterialIcons name="arrow-back" size={24} color="#2563EB" />
+        </TouchableOpacity>
+
+        <View style={styles.topBarTextBlock}>
+          <Text style={styles.topBarTitle}>Product Details</Text>
+          <Text style={styles.topBarSubtitle} numberOfLines={1}>
+            {product.category || 'Catalog item'}
+          </Text>
+        </View>
+
+        <View style={styles.topBarSpacer} />
+      </View>
+
+      <View style={styles.mediaCard}>
+        {product.images && product.images.length > 0 ? (
           <Image
             source={{ uri: product.images[currentImageIndex] }}
             style={styles.mainImage}
           />
-          {product.images.length > 1 && (
-            <View style={styles.imageIndicators}>
-              {product.images.map((_, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.indicator,
-                    currentImageIndex === index && styles.indicatorActive,
-                  ]}
-                  onPress={() => setCurrentImageIndex(index)}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      ) : (
-        <View style={styles.placeholderImage}>
-          <MaterialIcons name="image" size={80} color="#ccc" />
+        ) : (
+          <View style={styles.placeholderImage}>
+            <MaterialIcons name="image" size={80} color="#ccc" />
+          </View>
+        )}
+      </View>
+
+      {product.images && product.images.length > 1 && (
+        <View style={styles.imageIndicators}>
+          {product.images.map((_, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.indicator,
+                currentImageIndex === index && styles.indicatorActive,
+              ]}
+              onPress={() => setCurrentImageIndex(index)}
+            />
+          ))}
         </View>
       )}
 
       <View style={styles.content}>
-        <Text style={styles.productName}>{product.name}</Text>
-        <Text style={styles.category}>{product.category}</Text>
-        <Text style={styles.price}>${calculatePrice().toFixed(2)}</Text>
+        <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryBadgeText}>{product.category}</Text>
+        </View>
+        <Text
+          style={styles.price}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.72}
+        >
+          {formatCurrency(calculatePrice())}
+        </Text>
 
         <Text style={styles.sectionTitle}>Description</Text>
         <Text style={styles.description}>{product.description}</Text>
@@ -387,43 +435,79 @@ const ProductDetailScreen = ({ route, navigation }) => {
           />
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F8',
+    backgroundColor: theme.colors.background,
   },
-  headerBackButton: {
-    marginLeft: 12,
-    padding: 6,
+  scrollContent: {
+    paddingTop: 6,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  topBarBackButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 12,
     backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  topBarTextBlock: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  topBarTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -0.4,
+  },
+  topBarSubtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  topBarSpacer: {
+    width: 44,
+  },
+  mediaCard: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    height: 330,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   mainImage: {
     width: '100%',
-    height: 320,
-    resizeMode: 'cover',
-    borderRadius: 18,
-    marginTop: 12,
-    marginHorizontal: 16,
+    height: '100%',
+    resizeMode: 'contain',
   },
   placeholderImage: {
-    width: '100%',
-    height: 320,
-    backgroundColor: '#F3F4F6',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 18,
-    marginTop: 12,
-    marginHorizontal: 16,
   },
   imageIndicators: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
   indicator: {
     width: 8,
@@ -438,7 +522,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 10,
     marginBottom: 20,
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -446,21 +530,31 @@ const styles = StyleSheet.create({
     borderColor: '#E6E8EB',
   },
   productName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 5,
+    marginBottom: 8,
   },
-  category: {
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    backgroundColor: '#EFF6FF',
+    marginBottom: 12,
+  },
+  categoryBadgeText: {
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 10,
+    color: '#1E40AF',
+    fontWeight: '600',
   },
   price: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 36,
+    fontWeight: '800',
     color: '#2563EB',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   sectionTitle: {
     fontSize: 18,

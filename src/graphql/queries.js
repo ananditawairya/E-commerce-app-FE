@@ -9,6 +9,7 @@ export const GET_PRODUCTS = gql`
   query GetProducts(
     $search: String
     $category: String
+    $categories: [String!]
     $minPrice: Float
     $maxPrice: Float
     $inStockOnly: Boolean
@@ -19,6 +20,7 @@ export const GET_PRODUCTS = gql`
     products(
       search: $search
       category: $category
+      categories: $categories
       minPrice: $minPrice
       maxPrice: $maxPrice
       inStockOnly: $inStockOnly

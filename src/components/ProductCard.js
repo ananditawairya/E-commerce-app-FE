@@ -98,7 +98,14 @@ const ProductCard = ({ product, onPress, style }) => {
         <Text style={styles.productCategory}>{product.category}</Text>
 
         <View style={styles.bottomRow}>
-          <Text style={styles.productPrice}>{formatCurrency(product.basePrice)}</Text>
+          <Text
+            style={styles.productPrice}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            {formatCurrency(product.basePrice)}
+          </Text>
           <View style={styles.detailsPill}>
             <Text style={styles.detailsText}>Details</Text>
             <MaterialIcons name="arrow-forward" size={14} color="#1D4ED8" />
@@ -106,6 +113,28 @@ const ProductCard = ({ product, onPress, style }) => {
         </View>
       </View>
     </TouchableOpacity>
+  );
+};
+
+/**
+ * Compares ProductCard props to prevent unnecessary re-renders in lists.
+ * @param {{
+ *   product: object,
+ *   onPress: Function,
+ *   style?: object|Array<object>,
+ * }} prevProps Previous props.
+ * @param {{
+ *   product: object,
+ *   onPress: Function,
+ *   style?: object|Array<object>,
+ * }} nextProps Next props.
+ * @return {boolean} Whether props are equal.
+ */
+const areEqualProductCardProps = (prevProps, nextProps) => {
+  return (
+    prevProps.product === nextProps.product &&
+    prevProps.onPress === nextProps.onPress &&
+    prevProps.style === nextProps.style
   );
 };
 
@@ -168,17 +197,18 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   bottomRow: {
-    marginTop: 2,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: 8,
+    alignItems: 'flex-start',
   },
   productPrice: {
-    fontSize: 18,
+    width: '100%',
+    fontSize: 17,
     fontWeight: '800',
     color: '#1D4ED8',
+    lineHeight: 22,
   },
   detailsPill: {
+    marginTop: 7,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#DBEAFE',
@@ -194,4 +224,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProductCard;
+export default React.memo(ProductCard, areEqualProductCardProps);

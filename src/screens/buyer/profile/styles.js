@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import theme from '../../../theme/theme';
 
 /**
  * Style definitions for the buyer profile screen.
@@ -6,7 +7,7 @@ import { StyleSheet } from 'react-native';
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: theme.colors.background,
     },
     centerContainer: {
         flex: 1,
@@ -18,10 +19,10 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 24,
-        paddingTop: 60,
-        backgroundColor: '#FFFFFF',
+        paddingTop: 12,
+        backgroundColor: theme.colors.surface,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: theme.colors.border,
     },
     profileInfo: {
         flexDirection: 'row',
@@ -31,7 +32,7 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: theme.colors.primarySoft,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16,
@@ -39,21 +40,21 @@ const styles = StyleSheet.create({
     name: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#111827',
+        color: theme.colors.textPrimary,
     },
     email: {
         fontSize: 14,
-        color: '#6B7280',
+        color: theme.colors.textSecondary,
         marginTop: 2,
     },
     logoutButton: {
         padding: 8,
         borderRadius: 8,
-        backgroundColor: '#FEF2F2',
+        backgroundColor: '#FFEDEC',
     },
     section: {
         padding: 24,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: theme.colors.surface,
         marginTop: 12,
     },
     sectionHeader: {
@@ -65,7 +66,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#111827',
+        color: theme.colors.textPrimary,
     },
     addButton: {
         flexDirection: 'row',
@@ -74,7 +75,7 @@ const styles = StyleSheet.create({
     addButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#2563EB',
+        color: theme.colors.primary,
         marginLeft: 4,
     },
     addressCard: {
@@ -83,7 +84,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: theme.colors.border,
         marginBottom: 12,
     },
     addressInfo: {
@@ -97,7 +98,7 @@ const styles = StyleSheet.create({
     street: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#374151',
+        color: theme.colors.textPrimary,
         marginRight: 8,
     },
     defaultBadge: {
@@ -113,11 +114,11 @@ const styles = StyleSheet.create({
     },
     cityState: {
         fontSize: 14,
-        color: '#6B7280',
+        color: theme.colors.textSecondary,
     },
     country: {
         fontSize: 14,
-        color: '#6B7280',
+        color: theme.colors.textSecondary,
     },
     addressActions: {
         flexDirection: 'row',
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         marginTop: 8,
-        color: '#9CA3AF',
+        color: theme.colors.textMuted,
         fontSize: 14,
     },
     menuItem: {
@@ -142,7 +143,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: theme.colors.border,
     },
     menuItemLeft: {
         flexDirection: 'row',
@@ -151,7 +152,7 @@ const styles = StyleSheet.create({
     menuItemText: {
         fontSize: 16,
         fontWeight: '500',
-        color: '#374151',
+        color: theme.colors.textPrimary,
         marginLeft: 12,
     },
     modalOverlay: {
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: theme.colors.surface,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         padding: 24,
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#111827',
+        color: theme.colors.textPrimary,
     },
     modalForm: {
         marginBottom: 24,
@@ -183,13 +184,13 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#374151',
+        color: theme.colors.textPrimary,
         marginBottom: 8,
     },
     input: {
-        backgroundColor: '#F9FAFB',
+        backgroundColor: theme.colors.surfaceMuted,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: theme.colors.border,
         borderRadius: 8,
         padding: 12,
         fontSize: 15,
@@ -213,17 +214,17 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     saveButton: {
-        backgroundColor: '#2563EB',
+        backgroundColor: theme.colors.primary,
         borderRadius: 8,
         padding: 16,
         alignItems: 'center',
     },
     saveButtonDisabled: {
-        backgroundColor: '#AFC7FF',
+        backgroundColor: '#B7C6FF',
         opacity: 0.7,
     },
     saveButtonText: {
-        color: '#FFFFFF',
+        color: theme.colors.surface,
         fontSize: 16,
         fontWeight: '600',
     },

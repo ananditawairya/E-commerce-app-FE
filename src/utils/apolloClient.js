@@ -243,6 +243,32 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
   }
 });
 
+const REMOVED_APOLLO_OPTION_KEYS = ['canonizeResults'];
+
+/**
+ * Removes Apollo options that were removed in newer client versions.
+ * @param {object|undefined|null} options Raw Apollo options.
+ * @return {object|undefined|null} Sanitized options.
+ */
+const sanitizeRemovedApolloOptions = (options) => {
+  if (!options || typeof options !== 'object') {
+    return options;
+  }
+
+  let sanitizedOptions = options;
+
+  REMOVED_APOLLO_OPTION_KEYS.forEach((optionKey) => {
+    if (Object.prototype.hasOwnProperty.call(sanitizedOptions, optionKey)) {
+      if (sanitizedOptions === options) {
+        sanitizedOptions = { ...options };
+      }
+      delete sanitizedOptions[optionKey];
+    }
+  });
+
+  return sanitizedOptions;
+};
+
 const client = new ApolloClient({
   link: errorLink.concat(retryLink.concat(authLink.concat(httpLink))),
   cache: new InMemoryCache({
@@ -284,5 +310,46 @@ const client = new ApolloClient({
     },
   },
 });
+
+/**
+ * Ensures removed Apollo options are not passed to runtime internals.
+ * @param {ApolloClient<object>} apolloClientInstance Apollo client instance.
+ * @return {void}
+ */
+const patchRemovedApolloOptions = (apolloClientInstance) => {
+  if (!apolloClientInstance) {
+    return;
+  }
+
+  if (apolloClientInstance.defaultOptions?.watchQuery) {
+    apolloClientInstance.defaultOptions.watchQuery = sanitizeRemovedApolloOptions(
+      apolloClientInstance.defaultOptions.watchQuery
+    );
+  }
+  if (apolloClientInstance.defaultOptions?.query) {
+    apolloClientInstance.defaultOptions.query = sanitizeRemovedApolloOptions(
+      apolloClientInstance.defaultOptions.query
+    );
+  }
+
+  const originalWatchQuery = apolloClientInstance.watchQuery.bind(apolloClientInstance);
+  apolloClientInstance.watchQuery = (options) => (
+    originalWatchQuery(sanitizeRemovedApolloOptions(options))
+  );
+
+  const originalQuery = apolloClientInstance.query.bind(apolloClientInstance);
+  apolloClientInstance.query = (options) => (
+    originalQuery(sanitizeRemovedApolloOptions(options))
+  );
+
+  if (apolloClientInstance.cache?.diff) {
+    const originalDiff = apolloClientInstance.cache.diff.bind(apolloClientInstance.cache);
+    apolloClientInstance.cache.diff = (options) => (
+      originalDiff(sanitizeRemovedApolloOptions(options))
+    );
+  }
+};
+
+patchRemovedApolloOptions(client);
 
 export default client;

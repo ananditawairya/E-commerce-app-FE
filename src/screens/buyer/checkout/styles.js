@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import theme from '../../../theme/theme';
 
 /**
  * Style definitions for the buyer checkout screen.
@@ -6,7 +7,7 @@ import { StyleSheet } from 'react-native';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F8',
+    backgroundColor: theme.colors.background,
     padding: 20,
   },
   loadingContainer: {
@@ -21,28 +22,28 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.colors.textPrimary,
     marginBottom: 15,
     marginTop: 10,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   inputContainer: {
     marginBottom: 15,
   },
   input: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#111827',
+    color: theme.colors.textPrimary,
     fontWeight: '500',
   },
   inputError: {
@@ -56,12 +57,12 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   summaryCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#E6E8EB',
+    borderColor: theme.colors.border,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -70,31 +71,31 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
   },
   summaryValue: {
     fontSize: 14,
-    color: '#111827',
+    color: theme.colors.textPrimary,
     fontWeight: '500',
   },
   totalLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: theme.colors.textPrimary,
   },
   totalValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2563EB',
+    color: theme.colors.primary,
   },
   paymentNote: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },
   placeOrderButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: theme.colors.primary,
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   placeOrderText: {
-    color: '#fff',
+    color: theme.colors.surface,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -113,18 +114,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addressCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#E6E8EB',
+    borderColor: theme.colors.border,
     borderRadius: 14,
     padding: 16,
     width: 200,
     marginRight: 12,
   },
   selectedAddressCard: {
-    borderColor: '#2563EB',
+    borderColor: theme.colors.primary,
     borderWidth: 2,
-    backgroundColor: '#F0F7FF',
+    backgroundColor: theme.colors.primarySoft,
   },
   addressCardHeader: {
     flexDirection: 'row',
@@ -146,11 +147,11 @@ const styles = StyleSheet.create({
   addressStreet: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.colors.textPrimary,
   },
   addressCity: {
     fontSize: 13,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   modalOverlay: {
@@ -161,7 +162,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: 20,
     padding: 24,
     width: '100%',
@@ -179,41 +180,41 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.colors.textPrimary,
     marginTop: 12,
     textAlign: 'center',
   },
   modalMessage: {
     fontSize: 15,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 22,
   },
   addressPreview: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.surfaceMuted,
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.border,
   },
   previewText: {
     fontSize: 14,
-    color: '#374151',
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   modalButtons: {
     gap: 12,
   },
   modalButtonPrimary: {
-    backgroundColor: '#2563EB',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
   },
   modalButtonPrimaryText: {
-    color: '#fff',
+    color: theme.colors.surface,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
   },
   modalButtonSecondaryText: {
-    color: '#374151',
+    color: theme.colors.textPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

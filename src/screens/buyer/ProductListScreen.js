@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,8 @@ import {
 import { NetworkStatus, useQuery } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ChatBot from '../../components/ChatBot';
 import ProductCard from '../../components/ProductCard';
@@ -65,9 +67,12 @@ function enrichProducts(recommendations, products) {
  * @return {React.JSX.Element} Product list screen UI.
  */
 const ProductListScreen = ({ navigation, onLogout }) => {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedSort, setSelectedSort] = useState(DEFAULT_SORT);
   const [selectedPriceKey, setSelectedPriceKey] = useState(DEFAULT_PRICE_KEY);
   const [inStockOnly, setInStockOnly] = useState(false);
@@ -76,7 +81,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
 
   const [isSortModalVisible, setSortModalVisible] = useState(false);
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
-  const [draftCategory, setDraftCategory] = useState('');
+  const [draftCategories, setDraftCategories] = useState([]);
   const [draftPriceKey, setDraftPriceKey] = useState(DEFAULT_PRICE_KEY);
   const [draftInStockOnly, setDraftInStockOnly] = useState(false);
 
@@ -101,7 +106,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     setHasMore(true);
   }, [
     debouncedSearch,
-    selectedCategory,
+    selectedCategories,
     selectedSort,
     selectedPriceKey,
     inStockOnly,
@@ -128,7 +133,8 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   const productQueryVariables = useMemo(
     () => ({
       search: debouncedSearch || null,
-      category: selectedCategory || null,
+      category: selectedCategories.length === 1 ? selectedCategories[0] : null,
+      categories: selectedCategories.length > 0 ? selectedCategories : null,
       minPrice:
         typeof selectedPriceFilter.min === 'number'
           ? selectedPriceFilter.min
@@ -144,7 +150,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     }),
     [
       debouncedSearch,
-      selectedCategory,
+      selectedCategories,
       selectedPriceFilter,
       inStockOnly,
       sortForQuery,
@@ -195,7 +201,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
 
   const isDiscoveryMode =
     !debouncedSearch &&
-    !selectedCategory &&
+    selectedCategories.length === 0 &&
     selectedSort === DEFAULT_SORT &&
     selectedPriceKey === DEFAULT_PRICE_KEY &&
     !inStockOnly;
@@ -205,18 +211,18 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     SORT_OPTIONS[0].label;
 
   const appliedFilterCount =
-    (selectedCategory ? 1 : 0) +
+    (selectedCategories.length > 0 ? 1 : 0) +
     (selectedPriceKey !== DEFAULT_PRICE_KEY ? 1 : 0) +
     (inStockOnly ? 1 : 0) +
     (selectedSort !== DEFAULT_SORT ? 1 : 0);
 
-  const recommendedProducts = enrichProducts(
-    recData?.getRecommendations,
-    products
+  const recommendedProducts = useMemo(
+    () => enrichProducts(recData?.getRecommendations, products),
+    [recData?.getRecommendations, products]
   );
-  const trendingProducts = enrichProducts(
-    trendingData?.getTrendingProducts,
-    products
+  const trendingProducts = useMemo(
+    () => enrichProducts(trendingData?.getTrendingProducts, products),
+    [trendingData?.getTrendingProducts, products]
   );
 
   const handleLogout = async () => {
@@ -257,7 +263,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
    * @return {void} No return value.
    */
   const handleOpenFilterModal = () => {
-    setDraftCategory(selectedCategory);
+    setDraftCategories(selectedCategories);
     setDraftPriceKey(selectedPriceKey);
     setDraftInStockOnly(inStockOnly);
     setFilterModalVisible(true);
@@ -284,7 +290,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
    * @return {void} No return value.
    */
   const clearAllFilters = () => {
-    setSelectedCategory('');
+    setSelectedCategories([]);
     setSelectedSort(DEFAULT_SORT);
     setSelectedPriceKey(DEFAULT_PRICE_KEY);
     setInStockOnly(false);
@@ -306,7 +312,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
    * @return {void} No return value.
    */
   const resetDraftFilters = () => {
-    setDraftCategory('');
+    setDraftCategories([]);
     setDraftPriceKey(DEFAULT_PRICE_KEY);
     setDraftInStockOnly(false);
   };
@@ -316,10 +322,31 @@ const ProductListScreen = ({ navigation, onLogout }) => {
    * @return {void} No return value.
    */
   const applyFilterModal = () => {
-    setSelectedCategory(draftCategory);
+    setSelectedCategories(draftCategories);
     setSelectedPriceKey(draftPriceKey);
     setInStockOnly(draftInStockOnly);
     setFilterModalVisible(false);
+  };
+
+  /**
+   * Toggles one category in draft filters.
+   * @param {string} categoryName Category label.
+   * @return {void} No return value.
+   */
+  const handleToggleDraftCategory = (categoryName) => {
+    if (categoryName === ALL_CATEGORIES_LABEL) {
+      setDraftCategories([]);
+      return;
+    }
+
+    setDraftCategories((previousCategories) => {
+      if (previousCategories.includes(categoryName)) {
+        return previousCategories.filter(
+          (existingCategory) => existingCategory !== categoryName
+        );
+      }
+      return [...previousCategories, categoryName];
+    });
   };
 
   /**
@@ -337,11 +364,11 @@ const ProductListScreen = ({ navigation, onLogout }) => {
    * @param {object} product Product object.
    * @return {void} No return value.
    */
-  const handleNavigateToProductDetail = (product) => {
+  const handleNavigateToProductDetail = useCallback((product) => {
     navigation.navigate(PRODUCT_DETAIL_ROUTE, { product });
-  };
+  }, [navigation]);
 
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     if (!hasMore || isFetchingMore || isInitialLoading || products.length === 0) {
       return;
     }
@@ -383,9 +410,16 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     } catch (fetchError) {
       console.error('Failed to load more products:', fetchError);
     }
-  };
+  }, [
+    fetchMore,
+    hasMore,
+    isFetchingMore,
+    isInitialLoading,
+    productQueryVariables,
+    products.length,
+  ]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setHasMore(true);
       await refetch({
@@ -396,26 +430,22 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     } catch (refreshError) {
       console.error('Failed to refresh products:', refreshError);
     }
-  };
+  }, [productQueryVariables, refetch]);
 
   /**
    * Renders product.
    * @param {object} params Callback parameters.
    * @return {React.JSX.Element} Rendered element.
    */
-  const renderProduct = ({ item }) => (
+  const renderProduct = useCallback(({ item }) => (
     <ProductCard
       product={item}
       onPress={handleNavigateToProductDetail}
       style={styles.mainProductCard}
     />
-  );
+  ), [handleNavigateToProductDetail]);
 
-  /**
-   * Renders list header.
-   * @return {React.JSX.Element} Rendered element.
-   */
-  const renderListHeader = () => (
+  const listHeaderComponent = useMemo(() => (
     <ProductListDiscoveryHeader
       isDiscoveryMode={isDiscoveryMode}
       recommendedProducts={recommendedProducts}
@@ -426,11 +456,22 @@ const ProductListScreen = ({ navigation, onLogout }) => {
       loading={loading}
       productsCount={products.length}
     />
-  );
+  ), [
+    isDiscoveryMode,
+    recommendedProducts,
+    trendingProducts,
+    handleNavigateToProductDetail,
+    recLoading,
+    trendingLoading,
+    loading,
+    products.length,
+  ]);
+
+  const keyExtractor = useCallback((item) => item.id, []);
 
   return (
     <>
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <ProductListHeaderSection
           appliedFilterCount={appliedFilterCount}
           onClearAllFilters={clearAllFilters}
@@ -460,14 +501,22 @@ const ProductListScreen = ({ navigation, onLogout }) => {
           <FlatList
             data={products}
             renderItem={renderProduct}
-            keyExtractor={(item) => item.id}
+            keyExtractor={keyExtractor}
             numColumns={2}
-            contentContainerStyle={styles.productsGrid}
+            contentContainerStyle={[
+              styles.productsGrid,
+              { paddingBottom: tabBarHeight + insets.bottom + 24 },
+            ]}
             onRefresh={handleRefresh}
             refreshing={isRefreshing}
-            ListHeaderComponent={renderListHeader}
+            ListHeaderComponent={listHeaderComponent}
             onEndReached={loadMore}
             onEndReachedThreshold={0.35}
+            initialNumToRender={6}
+            maxToRenderPerBatch={8}
+            windowSize={7}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews
             ListFooterComponent={
               isFetchingMore ? (
                 <View style={styles.footerLoader}>
@@ -494,7 +543,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
             }
           />
         )}
-      </View>
+      </SafeAreaView>
 
       <ProductListSortModal
         debouncedSearch={debouncedSearch}
@@ -508,10 +557,10 @@ const ProductListScreen = ({ navigation, onLogout }) => {
         visible={isFilterModalVisible}
         onClose={handleCloseFilterModal}
         categoryOptions={categoryOptions}
-        draftCategory={draftCategory}
+        draftCategories={draftCategories}
         draftPriceKey={draftPriceKey}
         draftInStockOnly={draftInStockOnly}
-        onSelectCategory={setDraftCategory}
+        onToggleCategory={handleToggleDraftCategory}
         onSelectPrice={setDraftPriceKey}
         onToggleInStock={setDraftInStockOnly}
         onReset={resetDraftFilters}

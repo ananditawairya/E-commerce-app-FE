@@ -17,13 +17,13 @@ import styles from '../styles';
  * Filter selection bottom sheet for category, price, and stock availability.
  * @param {{
  *   categoryOptions: string[],
- *   draftCategory: string,
+ *   draftCategories: string[],
  *   draftInStockOnly: boolean,
  *   draftPriceKey: string,
  *   onApply: () => void,
  *   onClose: () => void,
  *   onReset: () => void,
- *   onSelectCategory: (value: string) => void,
+ *   onToggleCategory: (value: string) => void,
  *   onSelectPrice: (value: string) => void,
  *   onToggleInStock: (value: boolean) => void,
  *   visible: boolean,
@@ -32,13 +32,13 @@ import styles from '../styles';
  */
 export default function ProductListFilterModal({
   categoryOptions,
-  draftCategory,
+  draftCategories,
   draftInStockOnly,
   draftPriceKey,
   onApply,
   onClose,
   onReset,
-  onSelectCategory,
+  onToggleCategory,
   onSelectPrice,
   onToggleInStock,
   visible,
@@ -67,9 +67,10 @@ export default function ProductListFilterModal({
             <Text style={styles.filterSectionTitle}>Category</Text>
             <View style={styles.filterOptionsWrap}>
               {categoryOptions.map((option) => {
-                const normalizedOption =
-                  option === ALL_CATEGORIES_LABEL ? '' : option;
-                const isSelected = draftCategory === normalizedOption;
+                const isAllCategoriesOption = option === ALL_CATEGORIES_LABEL;
+                const isSelected = isAllCategoriesOption
+                  ? draftCategories.length === 0
+                  : draftCategories.includes(option);
 
                 return (
                   <TouchableOpacity
@@ -78,7 +79,13 @@ export default function ProductListFilterModal({
                       styles.modalFilterChip,
                       isSelected && styles.modalFilterChipSelected,
                     ]}
-                    onPress={() => onSelectCategory(normalizedOption)}
+                    onPress={() => {
+                      if (isAllCategoriesOption) {
+                        onToggleCategory(ALL_CATEGORIES_LABEL);
+                        return;
+                      }
+                      onToggleCategory(option);
+                    }}
                   >
                     <Text
                       style={[

@@ -13,12 +13,17 @@ import { GET_SELLER_ORDERS, GET_SELLER_PRODUCTS } from '../../graphql/queries';
 import { UPDATE_ORDER_STATUS, CANCEL_ORDER } from '../../graphql/mutations';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import theme from '../../theme/theme';
 
 /**
  * Seller order management screen.
  * @return {React.JSX.Element} Seller orders UI.
  */
 const OrdersScreen = () => {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const [hasSellerAccess, setHasSellerAccess] = useState(null);
 
   useEffect(() => {
@@ -187,10 +192,10 @@ const OrdersScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {hasSellerAccess === null || loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : hasSellerAccess === false ? (
         <View style={styles.emptyContainer}>
@@ -211,7 +216,10 @@ const OrdersScreen = () => {
           data={data?.sellerOrders || []}
           renderItem={renderOrder}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: tabBarHeight + insets.bottom + 20 },
+          ]}
           onRefresh={refetch}
           refreshing={loading}
           ListEmptyComponent={
@@ -222,14 +230,14 @@ const OrdersScreen = () => {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F8',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -240,12 +248,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   orderCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     padding: 14,
     borderRadius: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E6E8EB',
+    borderColor: theme.colors.border,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.06,
@@ -261,7 +269,7 @@ const styles = StyleSheet.create({
   orderId: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
+    color: theme.colors.textPrimary,
   },
   status: {
     fontSize: 12,
@@ -292,28 +300,28 @@ const styles = StyleSheet.create({
   },
   orderDate: {
     fontSize: 12,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginBottom: 10,
   },
   orderItem: {
     borderTopWidth: 1,
-    borderTopColor: '#E6E8EB',
+    borderTopColor: theme.colors.border,
     paddingTop: 10,
     marginTop: 10,
   },
   itemName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#111827',
+    color: theme.colors.textPrimary,
   },
   itemVariant: {
     fontSize: 12,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   itemQuantity: {
     fontSize: 12,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   orderFooter: {
@@ -322,20 +330,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#E6E8EB',
+    borderTopColor: theme.colors.border,
     paddingTop: 10,
   },
   totalText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2563EB',
+    color: theme.colors.primary,
   },
   actionButtons: {
     flexDirection: 'row',
     gap: 8,
   },
   updateButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
@@ -346,7 +354,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cancelButton: {
-    backgroundColor: '#EF4444',
+    backgroundColor: theme.colors.danger,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -367,20 +375,20 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#9CA3AF',
+    color: theme.colors.textMuted,
     marginTop: 10,
     textAlign: 'center',
   },
   errorText: {
     marginTop: 6,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     fontSize: 12,
     textAlign: 'center',
     paddingHorizontal: 16,
   },
   retryButton: {
     marginTop: 12,
-    backgroundColor: '#2563EB',
+    backgroundColor: theme.colors.primary,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 8,

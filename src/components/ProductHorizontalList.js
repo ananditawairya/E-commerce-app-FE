@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
     View,
     Text,
@@ -41,13 +41,15 @@ const ProductHorizontalList = ({ title, products, onProductPress, loading }) => 
      * @param {object} params Callback parameters.
      * @return {React.JSX.Element} Rendered element.
      */
-    const renderItem = ({ item }) => (
+    const renderItem = useCallback(({ item }) => (
         <ProductCard
             product={item}
             onPress={onProductPress}
             style={styles.card}
         />
-    );
+    ), [onProductPress]);
+
+    const keyExtractor = useCallback((item) => item.id || item.productId, []);
 
     return (
         <View style={styles.container}>
@@ -55,10 +57,14 @@ const ProductHorizontalList = ({ title, products, onProductPress, loading }) => 
             <FlatList
                 data={products}
                 renderItem={renderItem}
-                keyExtractor={(item) => item.id || item.productId}
+                keyExtractor={keyExtractor}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.listContent}
+                initialNumToRender={4}
+                maxToRenderPerBatch={4}
+                windowSize={5}
+                removeClippedSubviews
             />
         </View>
     );
@@ -93,4 +99,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ProductHorizontalList;
+export default React.memo(ProductHorizontalList);

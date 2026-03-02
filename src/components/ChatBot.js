@@ -16,6 +16,8 @@ import {
 import { useMutation } from '@apollo/client';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SEND_CHAT_MESSAGE } from '../graphql/mutations';
 
 /**
@@ -24,6 +26,8 @@ import { SEND_CHAT_MESSAGE } from '../graphql/mutations';
  * @return {React.JSX.Element} Floating action button and chat modal.
  */
 const ChatBot = ({ navigation }) => {
+    const insets = useSafeAreaInsets();
+    const tabBarHeight = useBottomTabBarHeight();
     const [isOpen, setIsOpen] = useState(false);
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([
@@ -341,7 +345,13 @@ const ChatBot = ({ navigation }) => {
     return (
         <>
             {/* Floating Chat Button */}
-            <Animated.View style={[styles.floatingButton, { transform: [{ scale: pulseAnim }] }]}>
+            <Animated.View
+                style={[
+                    styles.floatingButton,
+                    { bottom: tabBarHeight + insets.bottom + 16 },
+                    { transform: [{ scale: pulseAnim }] },
+                ]}
+            >
                 <TouchableOpacity
                     style={styles.chatButton}
                     onPress={() => setIsOpen(true)}
@@ -429,7 +439,6 @@ const ChatBot = ({ navigation }) => {
 const styles = StyleSheet.create({
     floatingButton: {
         position: 'absolute',
-        bottom: 90,
         right: 20,
         zIndex: 1000,
     },

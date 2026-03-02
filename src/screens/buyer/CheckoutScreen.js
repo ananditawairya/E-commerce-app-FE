@@ -11,6 +11,7 @@ import {
 import { useMutation, useQuery } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CustomDropdown from '../../atoms/CustomDropdown';
 import { CHECKOUT, TRACK_EVENT, ADD_ADDRESS } from '../../graphql/mutations';
@@ -28,6 +29,7 @@ import {
 } from '../../utils/locationData';
 import SaveAddressModal from './checkout/components/SaveAddressModal';
 import styles from './checkout/styles';
+import theme from '../../theme/theme';
 
 const BUYER_HOME_ROUTE = 'BuyerHome';
 
@@ -58,6 +60,7 @@ const COUNTRY_ITEMS = [
  * @return {React.JSX.Element} Checkout UI.
  */
 const CheckoutScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
@@ -438,9 +441,11 @@ const CheckoutScreen = ({ navigation }) => {
 
   if (cartLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
-      </View>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -456,7 +461,11 @@ const CheckoutScreen = ({ navigation }) => {
   const isCheckoutDisabled = checkoutLoading || !isFormValid();
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 26 }}
+      >
       {userData?.me?.addresses?.length > 0 && (
         <>
           <Text style={styles.sectionTitle}>Select Saved Address</Text>
@@ -609,7 +618,8 @@ const CheckoutScreen = ({ navigation }) => {
         zipCode={zipCode}
         country={country}
       />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

@@ -12,6 +12,9 @@ import { useQuery } from '@apollo/client';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { GET_SELLER_ANALYTICS } from '../../graphql/queries';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import theme from '../../theme/theme';
 
 const chartWidth = Dimensions.get('window').width - 40;
 
@@ -33,6 +36,8 @@ const formatCurrency = (value) => `$${value.toFixed(2)}`;
  * @return {React.JSX.Element} Analytics charts and summary stats.
  */
 const AnalyticsScreen = () => {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const [days, setDays] = useState(7);
   const [hasSellerAccess, setHasSellerAccess] = useState(null);
 
@@ -79,7 +84,14 @@ const AnalyticsScreen = () => {
   }, [analytics]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: tabBarHeight + insets.bottom + 20 },
+        ]}
+      >
       <View style={styles.header}>
         <Text style={styles.title}>Analytics</Text>
         <View style={styles.rangeRow}>
@@ -102,7 +114,7 @@ const AnalyticsScreen = () => {
 
       {hasSellerAccess === null || (loading && !analytics) ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : hasSellerAccess === false ? (
         <View style={styles.loading}>
@@ -147,12 +159,12 @@ const AnalyticsScreen = () => {
               height={220}
               yAxisLabel="$"
               chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
+                backgroundColor: theme.colors.surface,
+                backgroundGradientFrom: theme.colors.surface,
+                backgroundGradientTo: theme.colors.surface,
                 decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-                labelColor: () => '#6B7280',
+                color: (opacity = 1) => `rgba(46, 69, 211, ${opacity})`,
+                labelColor: () => theme.colors.textSecondary,
                 propsForDots: {
                   r: '4',
                   strokeWidth: '2',
@@ -175,26 +187,27 @@ const AnalyticsScreen = () => {
               height={220}
               yAxisLabel=""
               chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
+                backgroundColor: theme.colors.surface,
+                backgroundGradientFrom: theme.colors.surface,
+                backgroundGradientTo: theme.colors.surface,
                 decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-                labelColor: () => '#6B7280',
+                color: (opacity = 1) => `rgba(46, 69, 211, ${opacity})`,
+                labelColor: () => theme.colors.textSecondary,
               }}
               style={styles.chart}
             />
           </View>
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F8',
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 20,
@@ -205,7 +218,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.colors.textPrimary,
     marginBottom: 12,
   },
   rangeRow: {
@@ -215,21 +228,21 @@ const styles = StyleSheet.create({
   rangeChip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#E6E8EB',
+    borderColor: theme.colors.border,
   },
   rangeChipActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   rangeText: {
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
   rangeTextActive: {
-    color: '#fff',
+    color: theme.colors.surface,
   },
   loading: {
     marginTop: 40,
@@ -238,24 +251,24 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#DC2626',
+    color: theme.colors.danger,
   },
   errorDetails: {
     marginTop: 6,
     fontSize: 12,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 16,
   },
   retryButton: {
     marginTop: 12,
-    backgroundColor: '#2563EB',
+    backgroundColor: theme.colors.primary,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   retryText: {
-    color: '#fff',
+    color: theme.colors.surface,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -266,34 +279,34 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E6E8EB',
+    borderColor: theme.colors.border,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginBottom: 6,
   },
   statValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.colors.textPrimary,
   },
   chartCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#E6E8EB',
+    borderColor: theme.colors.border,
     marginBottom: 16,
   },
   chartTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   chart: {

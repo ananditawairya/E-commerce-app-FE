@@ -3,6 +3,7 @@ import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import styles from '../styles';
+import theme from '../../../../theme/theme';
 
 /**
  * Header area with logout, search, and primary filter actions.
@@ -48,7 +49,7 @@ export default function ProductListHeaderSection({
           accessibilityLabel="Logout"
           accessibilityHint="Logout from the application"
         >
-          <MaterialIcons name="logout" size={22} color="#1D4ED8" />
+          <MaterialIcons name="logout" size={22} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -56,19 +57,19 @@ export default function ProductListHeaderSection({
         <MaterialIcons
           name="search"
           size={20}
-          color="#64748B"
+          color={theme.colors.textSecondary}
           style={styles.searchIcon}
         />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name or keyword..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={theme.colors.textMuted}
           value={searchInput}
           onChangeText={onSearchChange}
         />
         {hasSearchText && (
           <TouchableOpacity onPress={onClearSearch}>
-            <MaterialIcons name="close" size={20} color="#64748B" />
+            <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -79,7 +80,7 @@ export default function ProductListHeaderSection({
           onPress={onOpenSortModal}
           activeOpacity={0.85}
         >
-          <MaterialIcons name="sort" size={17} color="#1E293B" />
+          <MaterialIcons name="sort" size={17} color={theme.colors.textPrimary} />
           <Text style={styles.toolbarButtonText}>{selectedSortLabel}</Text>
         </TouchableOpacity>
 
@@ -94,7 +95,7 @@ export default function ProductListHeaderSection({
           <MaterialIcons
             name="tune"
             size={16}
-            color={hasAppliedFilters ? '#1D4ED8' : '#1E293B'}
+            color={hasAppliedFilters ? theme.colors.primary : theme.colors.textPrimary}
           />
           <Text
             style={[

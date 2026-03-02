@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Auth Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -16,6 +17,7 @@ import CartScreen from '../screens/buyer/CartScreen';
 import CheckoutScreen from '../screens/buyer/CheckoutScreen';
 import ProfileScreen from '../screens/buyer/ProfileScreen';
 import OrderHistoryScreen from '../screens/buyer/OrderHistoryScreen';
+import OrderDetailScreen from '../screens/buyer/OrderDetailScreen';
 
 // Seller Screens
 import SellerProductsScreen from '../screens/seller/SellerProductsScreen';
@@ -24,6 +26,7 @@ import OrdersScreen from '../screens/seller/OrdersScreen';
 import AnalyticsScreen from '../screens/seller/AnalyticsScreen';
 import { API_BASE_URL } from '../config/api';
 import apolloClient from '../utils/apolloClient';
+import theme from '../theme/theme';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -34,6 +37,8 @@ const Tab = createBottomTabNavigator();
  * @return {React.JSX.Element} Buyer tab navigation.
  */
 const BuyerTabs = ({ onLogout }) => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -41,22 +46,25 @@ const BuyerTabs = ({ onLogout }) => {
           let iconName;
           if (route.name === 'Products') iconName = 'home';
           else if (route.name === 'Cart') iconName = 'shopping-cart';
-          else if (route.name==='Profile') iconName='person';
+          else if (route.name === 'Profile') iconName = 'person';
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#2563EB',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.tabInactive,
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#E6E8EB',
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
           borderTopWidth: 1,
-          height: 58,
-          paddingBottom: 6,
+          height: 58 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 8),
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
         },
+        tabBarHideOnKeyboard: true,
+        headerShown: false,
       })}
     >
       <Tab.Screen name="Products">
@@ -76,6 +84,8 @@ const BuyerTabs = ({ onLogout }) => {
  * @return {React.JSX.Element} Seller tab navigation.
  */
 const SellerTabs = ({ onLogout }) => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -86,19 +96,22 @@ const SellerTabs = ({ onLogout }) => {
           else if (route.name === 'Analytics') iconName = 'insights';
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#2563EB',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.tabInactive,
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#E6E8EB',
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
           borderTopWidth: 1,
-          height: 58,
-          paddingBottom: 6,
+          height: 58 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 8),
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
         },
+        tabBarHideOnKeyboard: true,
+        headerShown: false,
       })}
     >
       <Tab.Screen name="MyProducts">
@@ -342,6 +355,13 @@ const AppNavigator = () => {
             <Stack.Screen
               name="OrderHistory"
               component={OrderHistoryScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="OrderDetail"
+              component={OrderDetailScreen}
               options={{
                 headerShown: false,
               }}

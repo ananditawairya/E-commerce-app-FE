@@ -1,4 +1,5 @@
-const DEFAULT_API_BASE_URL = 'http://65.0.242.12';
+//const DEFAULT_API_BASE_URL = 'http://65.0.242.12';
+const DEFAULT_API_BASE_URL = 'http://localhost:4000';
 
 /**
  * API base URL for frontend network requests.

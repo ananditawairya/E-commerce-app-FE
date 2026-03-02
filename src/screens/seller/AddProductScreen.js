@@ -12,6 +12,7 @@ import { useMutation } from '@apollo/client';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CREATE_PRODUCT, UPDATE_PRODUCT } from '../../graphql/mutations';
 import { GET_SELLER_PRODUCTS } from '../../graphql/queries';
@@ -39,6 +40,7 @@ const IMAGE_DATA_PREFIX = 'data:image/';
  * @return {React.JSX.Element} Product form UI.
  */
 const AddProductScreen = ({ route, navigation }) => {
+  const insets = useSafeAreaInsets();
   const isEdit = !!route.params?.product;
   const product = route.params?.product;
 
@@ -483,7 +485,11 @@ const AddProductScreen = ({ route, navigation }) => {
   const loading = createLoading || updateLoading;
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+      >
       <TextInput
         style={styles.input}
         placeholder="Product Name *"
@@ -575,7 +581,8 @@ const AddProductScreen = ({ route, navigation }) => {
           </Text>
         )}
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
