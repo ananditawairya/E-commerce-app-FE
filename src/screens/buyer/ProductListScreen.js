@@ -18,6 +18,7 @@ import ProductCard from '../../components/ProductCard';
 import {
   GET_CATEGORIES,
   GET_PRODUCTS,
+  GET_SEARCH_SUGGESTIONS,
   GET_RECOMMENDATIONS,
   GET_TRENDING_PRODUCTS,
 } from '../../graphql/queries';
@@ -78,6 +79,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   const [inStockOnly, setInStockOnly] = useState(false);
   const [userId, setUserId] = useState(null);
   const [hasMore, setHasMore] = useState(true);
+  const [isSearchFocused, setSearchFocused] = useState(false);
 
   const [isSortModalVisible, setSortModalVisible] = useState(false);
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
@@ -129,6 +131,9 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     selectedSort === 'RELEVANCE' && !debouncedSearch
       ? DEFAULT_SORT
       : selectedSort;
+  const trimmedSearchInput = searchInput.trim();
+  const shouldFetchSuggestions =
+    isSearchFocused && trimmedSearchInput.length >= 2;
 
   const productQueryVariables = useMemo(
     () => ({
@@ -189,8 +194,21 @@ const ProductListScreen = ({ navigation, onLogout }) => {
   );
 
   const { data: categoriesData } = useQuery(GET_CATEGORIES);
+  const {
+    data: suggestionsData,
+    loading: suggestionsLoading,
+  } = useQuery(GET_SEARCH_SUGGESTIONS, {
+    variables: {
+      query: trimmedSearchInput,
+      categories: selectedCategories.length ? selectedCategories : null,
+      limit: 8,
+    },
+    skip: !shouldFetchSuggestions,
+    fetchPolicy: 'no-cache',
+  });
 
   const products = data?.products || [];
+  const suggestions = suggestionsData?.searchSuggestions || [];
   const isInitialLoading = loading && products.length === 0;
   const isFetchingMore = networkStatus === NetworkStatus.fetchMore;
   const isRefreshing = networkStatus === NetworkStatus.refetch;
@@ -283,6 +301,8 @@ const ProductListScreen = ({ navigation, onLogout }) => {
    */
   const handleClearSearch = () => {
     setSearchInput('');
+    setDebouncedSearch('');
+    setSearchFocused(false);
   };
 
   /**
@@ -358,6 +378,28 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     setSelectedSort(nextSort);
     setSortModalVisible(false);
   };
+
+  /**
+   * Updates search input and keeps suggestions active while typing.
+   * @param {string} value Search text.
+   * @return {void} No return value.
+   */
+  const handleSearchChange = useCallback((value) => {
+    setSearchInput(value);
+    setSearchFocused(true);
+  }, []);
+
+  /**
+   * Applies one search suggestion.
+   * @param {string} suggestionText Suggested text.
+   * @return {void} No return value.
+   */
+  const handleSelectSuggestion = useCallback((suggestionText) => {
+    const nextSearch = suggestionText.trim();
+    setSearchInput(nextSearch);
+    setDebouncedSearch(nextSearch);
+    setSearchFocused(false);
+  }, []);
 
   /**
    * Handles navigate to product detail.
@@ -474,14 +516,20 @@ const ProductListScreen = ({ navigation, onLogout }) => {
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <ProductListHeaderSection
           appliedFilterCount={appliedFilterCount}
+          isSuggestionsLoading={suggestionsLoading}
           onClearAllFilters={clearAllFilters}
           onClearSearch={handleClearSearch}
           onLogout={handleLogout}
           onOpenFilterModal={handleOpenFilterModal}
           onOpenSortModal={handleOpenSortModal}
-          onSearchChange={setSearchInput}
+          onSearchBlur={() => setSearchFocused(false)}
+          onSearchChange={handleSearchChange}
+          onSearchFocus={() => setSearchFocused(true)}
+          onSuggestionPress={handleSelectSuggestion}
           searchInput={searchInput}
           selectedSortLabel={selectedSortLabel}
+          showSuggestions={shouldFetchSuggestions}
+          suggestions={suggestions}
         />
 
         {isInitialLoading ? (

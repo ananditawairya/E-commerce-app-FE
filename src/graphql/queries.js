@@ -91,6 +91,22 @@ export const GET_CATEGORIES = gql`
   }
 `;
 
+/** Fetches type-ahead search suggestions. */
+export const GET_SEARCH_SUGGESTIONS = gql`
+  query GetSearchSuggestions(
+    $query: String!
+    $categories: [String!]
+    $limit: Int
+  ) {
+    searchSuggestions(query: $query, categories: $categories, limit: $limit) {
+      text
+      category
+      score
+      source
+    }
+  }
+`;
+
 /** Fetches the currently authenticated user profile. */
 export const ME = gql`
   query Me($token: String!) {

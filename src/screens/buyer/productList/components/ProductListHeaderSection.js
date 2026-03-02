@@ -9,27 +9,39 @@ import theme from '../../../../theme/theme';
  * Header area with logout, search, and primary filter actions.
  * @param {{
  *   appliedFilterCount: number,
+ *   isSuggestionsLoading: boolean,
  *   onClearAllFilters: () => void,
  *   onClearSearch: () => void,
  *   onLogout: () => void,
  *   onOpenFilterModal: () => void,
  *   onOpenSortModal: () => void,
+ *   onSearchBlur: () => void,
  *   onSearchChange: (value: string) => void,
+ *   onSearchFocus: () => void,
+ *   onSuggestionPress: (value: string) => void,
  *   searchInput: string,
  *   selectedSortLabel: string,
+ *   showSuggestions: boolean,
+ *   suggestions: Array<{text: string, category: string | null}>,
  * }} props Component props.
  * @return {React.JSX.Element} Header section UI.
  */
 export default function ProductListHeaderSection({
   appliedFilterCount,
+  isSuggestionsLoading,
   onClearAllFilters,
   onClearSearch,
   onLogout,
   onOpenFilterModal,
   onOpenSortModal,
+  onSearchBlur,
   onSearchChange,
+  onSearchFocus,
+  onSuggestionPress,
   searchInput,
   selectedSortLabel,
+  showSuggestions,
+  suggestions,
 }) {
   const hasSearchText = searchInput.length > 0;
   const hasAppliedFilters = appliedFilterCount > 0;
@@ -66,6 +78,14 @@ export default function ProductListHeaderSection({
           placeholderTextColor={theme.colors.textMuted}
           value={searchInput}
           onChangeText={onSearchChange}
+          onFocus={onSearchFocus}
+          onBlur={() => {
+            setTimeout(() => {
+              onSearchBlur();
+            }, 120);
+          }}
+          autoCorrect={false}
+          autoCapitalize="none"
         />
         {hasSearchText && (
           <TouchableOpacity onPress={onClearSearch}>
@@ -73,6 +93,36 @@ export default function ProductListHeaderSection({
           </TouchableOpacity>
         )}
       </View>
+
+      {showSuggestions && (
+        <View style={styles.suggestionPanel}>
+          {isSuggestionsLoading ? (
+            <Text style={styles.suggestionLoadingText}>Searching suggestions...</Text>
+          ) : suggestions.length > 0 ? (
+            suggestions.map((suggestion) => (
+              <TouchableOpacity
+                key={`${suggestion.text}:${suggestion.category || 'all'}`}
+                style={styles.suggestionRow}
+                onPress={() => onSuggestionPress(suggestion.text)}
+              >
+                <MaterialIcons
+                  name="north-west"
+                  size={15}
+                  color={theme.colors.textSecondary}
+                />
+                <View style={styles.suggestionTextWrap}>
+                  <Text style={styles.suggestionText}>{suggestion.text}</Text>
+                  {suggestion.category ? (
+                    <Text style={styles.suggestionCategory}>{suggestion.category}</Text>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={styles.suggestionEmptyText}>No suggestions found</Text>
+          )}
+        </View>
+      )}
 
       <View style={styles.filterToolbar}>
         <TouchableOpacity
