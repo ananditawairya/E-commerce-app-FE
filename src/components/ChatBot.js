@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -36,9 +36,7 @@ const ChatBot = ({ navigation }) => {
             role: 'assistant',
             content: "Hi! 👋 I'm your personal AI shopping assistant. \n\nI can help you find products, compare options, or suggest the perfect gear for your next adventure. What's on your mind today?",
             products: [],
-            appliedFilters: [],
             followUpQuestion: null,
-            metadata: null,
         },
     ]);
     const [conversationId, setConversationId] = useState(null);
@@ -107,29 +105,9 @@ const ChatBot = ({ navigation }) => {
             .trim();
     };
 
-    /**
-     * Extracts known assistant metadata flags.
-     * @param {object|null|undefined} payload Response payload.
-     * @return {{
-     *   latencyMs: number|null,
-     *   cacheHit: boolean,
-     *   safetyBlocked: boolean,
-     *   semanticUsed: boolean,
-     * }|null} Parsed metadata.
-     */
-    const getAssistantMetadata = (payload) => {
-        if (!payload) {
-            return null;
-        }
-
-        const latencyMs = Number(payload.latencyMs);
-        return {
-            latencyMs: Number.isFinite(latencyMs) ? latencyMs : null,
-            cacheHit: Boolean(payload.cacheHit),
-            safetyBlocked: Boolean(payload.safetyBlocked),
-            semanticUsed: Boolean(payload.semanticUsed),
-        };
-    };
+    const chatListBottomPadding = useMemo(() => {
+        return Math.max(insets.bottom, 8) + 16;
+    }, [insets.bottom]);
 
     useEffect(() => {
         const getUserId = async () => {
@@ -192,11 +170,7 @@ const ChatBot = ({ navigation }) => {
                     role: 'assistant',
                     content: normalizeAssistantText(assistantContent),
                     products: data.sendChatMessage.products || [],
-                    appliedFilters: Array.isArray(data.sendChatMessage.appliedFilters)
-                        ? data.sendChatMessage.appliedFilters
-                        : [],
                     followUpQuestion: data.sendChatMessage.followUpQuestion || null,
-                    metadata: getAssistantMetadata(data.sendChatMessage),
                 };
 
                 setMessages(prev => [...prev, aiMessage]);
@@ -210,9 +184,7 @@ const ChatBot = ({ navigation }) => {
                     role: 'assistant',
                     content: "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
                     products: [],
-                    appliedFilters: [],
                     followUpQuestion: null,
-                    metadata: null,
                 },
             ]);
         }
@@ -307,37 +279,24 @@ const ChatBot = ({ navigation }) => {
     const renderItem = ({ item }) => (
         <View>
             {renderMessage({ item })}
-            {item.role === 'assistant' && Array.isArray(item.appliedFilters) && item.appliedFilters.length > 0 && (
-                <View style={styles.filterChipRow}>
-                    {item.appliedFilters.slice(0, 4).map((filter) => (
-                        <View key={`${item.id}_${filter}`} style={styles.filterChip}>
-                            <Text style={styles.filterChipText} numberOfLines={1}>{filter}</Text>
-                        </View>
-                    ))}
-                </View>
-            )}
             {item.role === 'assistant' && item.followUpQuestion && (
                 <View style={styles.followUpContainer}>
                     <Text style={styles.followUpText}>{item.followUpQuestion}</Text>
                 </View>
             )}
             {item.products && item.products.length > 0 && (
-                <View style={styles.productsRow}>
-                    {item.products.slice(0, 3).map(renderProductCard)}
-                </View>
-            )}
-            {item.role === 'assistant' && item.metadata && (
-                <View style={styles.metaRow}>
-                    {typeof item.metadata.latencyMs === 'number' && (
-                        <Text style={styles.metaText}>~{item.metadata.latencyMs}ms</Text>
-                    )}
-                    {item.metadata.cacheHit && (
-                        <Text style={styles.metaText}>cache</Text>
-                    )}
-                    {item.metadata.semanticUsed && (
-                        <Text style={styles.metaText}>semantic</Text>
-                    )}
-                </View>
+                <FlatList
+                    data={item.products}
+                    horizontal
+                    keyExtractor={(product, index) => {
+                        return `${item.id}_${product.id || product.name || index}`;
+                    }}
+                    renderItem={({ item: product }) => renderProductCard(product)}
+                    style={styles.productsRow}
+                    contentContainerStyle={styles.productsRowContent}
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                />
             )}
         </View>
     );
@@ -395,7 +354,7 @@ const ChatBot = ({ navigation }) => {
                             data={messages}
                             renderItem={renderItem}
                             keyExtractor={(item) => item.id}
-                            contentContainerStyle={styles.messagesList}
+                            contentContainerStyle={[styles.messagesList, { paddingBottom: chatListBottomPadding }]}
                             onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
                             onLayout={() => flatListRef.current?.scrollToEnd()}
                             keyboardShouldPersistTaps="handled"
@@ -552,33 +511,12 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     productsRow: {
-        flexDirection: 'row',
         marginLeft: 40,
         marginBottom: 16,
         paddingTop: 4,
     },
-    filterChipRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginLeft: 40,
-        marginTop: -4,
-        marginBottom: 8,
-    },
-    filterChip: {
-        backgroundColor: '#EEF4FF',
-        borderColor: '#D9E6FF',
-        borderWidth: 1,
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        maxWidth: '90%',
-        marginRight: 6,
-        marginBottom: 6,
-    },
-    filterChipText: {
-        color: '#1D4ED8',
-        fontSize: 12,
-        fontWeight: '600',
+    productsRowContent: {
+        paddingRight: 20,
     },
     followUpContainer: {
         marginLeft: 40,
@@ -588,17 +526,6 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#4B5563',
         fontStyle: 'italic',
-    },
-    metaRow: {
-        flexDirection: 'row',
-        marginLeft: 40,
-        marginTop: -6,
-        marginBottom: 10,
-    },
-    metaText: {
-        fontSize: 11,
-        color: '#9CA3AF',
-        marginRight: 8,
     },
     productCard: {
         width: 120,
