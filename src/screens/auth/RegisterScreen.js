@@ -1,52 +1,108 @@
+import { useMutation } from '@apollo/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
+  View,
 } from 'react-native';
-import { useMutation } from '@apollo/client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { REGISTER } from '../../graphql/mutations';
-import { validateEmail, validatePassword, validateName, validatePasswordMatch } from '../../utils/validators';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const RegisterScreen = ({ navigation, onAuthSuccess }) => {
+import { REGISTER } from '../../graphql/mutations';
+import {
+  validateEmail,
+  validateName,
+  validatePassword,
+  validatePasswordMatch,
+} from '../../utils/validators';
+
+const ROLES = {
+  BUYER: 'buyer',
+  SELLER: 'seller',
+};
+
+const STORAGE_KEYS = {
+  ACCESS_TOKEN: 'accessToken',
+  REFRESH_TOKEN: 'refreshToken',
+  USER_ID: 'userId',
+  USER_ROLE: 'userRole',
+};
+
+const TOUCHED_INITIAL_STATE = {
+  name: false,
+  email: false,
+  password: false,
+  confirmPassword: false,
+};
+
+const TOUCHED_SUBMITTED_STATE = {
+  name: true,
+  email: true,
+  password: true,
+  confirmPassword: true,
+};
+
+const ICON_COLOR = '#6b7280';
+const PLACEHOLDER_COLOR = '#9ca3af';
+const UNKNOWN_ERROR_MESSAGE = 'Unknown error';
+
+/**
+ * User registration screen.
+ * @param {{
+ *   navigation: object,
+ *   onAuthSuccess?: () => void,
+ * }} props Screen props.
+ * @return {React.JSX.Element} Register screen UI.
+ */
+export function RegisterScreen({ navigation, onAuthSuccess }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('buyer');
+  const [role, setRole] = useState(ROLES.BUYER);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // CHANGE: Add validation error states
   const [nameError, setNameError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
-  const [touched, setTouched] = useState({
-    name: false,
-    email: false,
-    password: false,
-    confirmPassword: false,
-  });
+  const [touched, setTouched] = useState(TOUCHED_INITIAL_STATE);
 
   const [register, { loading }] = useMutation(REGISTER, {
     onCompleted: async (data) => {
       try {
-        await AsyncStorage.setItem('accessToken', data.register.accessToken);
-        await AsyncStorage.setItem('refreshToken', data.register.refreshToken);
-        await AsyncStorage.setItem('userRole', data.register.user.role);
-        await AsyncStorage.setItem('userId', data.register.user.id);
-        
-        Alert.alert('Success', 'Account created successfully!');
-        if (onAuthSuccess) {
-          onAuthSuccess();
+        const registerData = data?.register;
+        const userData = registerData?.user;
+        const accessToken = registerData?.accessToken;
+        const refreshToken = registerData?.refreshToken;
+        const userRole = userData?.role;
+        const userId = userData?.id;
+
+        if (!accessToken || !refreshToken || !userRole || !userId) {
+          throw new Error('Invalid registration response data');
         }
+
+        await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+        await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_ROLE, userRole);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, userId);
+
+        onAuthSuccess?.();
       } catch (error) {
-        Alert.alert('Error', 'Failed to save credentials');
+        const message =
+          error instanceof Error ? error.message : UNKNOWN_ERROR_MESSAGE;
+        Alert.alert('Error', `Failed to save credentials: ${message}`);
       }
     },
     onError: (error) => {
@@ -54,7 +110,11 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
     },
   });
 
-  // CHANGE: Real-time validation handlers
+  /**
+   * Handles name change.
+   * @param {string} text Input text.
+   * @return {void} No return value.
+   */
   const handleNameChange = (text) => {
     setName(text);
     if (touched.name) {
@@ -63,6 +123,11 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
     }
   };
 
+  /**
+   * Handles email change.
+   * @param {string} text Input text.
+   * @return {void} No return value.
+   */
   const handleEmailChange = (text) => {
     setEmail(text);
     if (touched.email) {
@@ -71,19 +136,28 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
     }
   };
 
+  /**
+   * Handles password change.
+   * @param {string} text Input text.
+   * @return {void} No return value.
+   */
   const handlePasswordChange = (text) => {
     setPassword(text);
     if (touched.password) {
       const validation = validatePassword(text);
       setPasswordError(validation.error);
     }
-    // CHANGE: Re-validate confirm password if it's been touched
     if (touched.confirmPassword && confirmPassword) {
       const matchValidation = validatePasswordMatch(text, confirmPassword);
       setConfirmPasswordError(matchValidation.error);
     }
   };
 
+  /**
+   * Handles confirm password change.
+   * @param {string} text Input text.
+   * @return {void} No return value.
+   */
   const handleConfirmPasswordChange = (text) => {
     setConfirmPassword(text);
     if (touched.confirmPassword) {
@@ -92,53 +166,82 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
     }
   };
 
-  // CHANGE: Blur handlers
+  /**
+   * Handles name blur.
+   * @return {void} No return value.
+   */
   const handleNameBlur = () => {
-    setTouched(prev => ({ ...prev, name: true }));
+    setTouched((prevState) => ({ ...prevState, name: true }));
     const validation = validateName(name);
     setNameError(validation.error);
   };
 
+  /**
+   * Handles email blur.
+   * @return {void} No return value.
+   */
   const handleEmailBlur = () => {
-    setTouched(prev => ({ ...prev, email: true }));
+    setTouched((prevState) => ({ ...prevState, email: true }));
     const validation = validateEmail(email);
     setEmailError(validation.error);
   };
 
+  /**
+   * Handles password blur.
+   * @return {void} No return value.
+   */
   const handlePasswordBlur = () => {
-    setTouched(prev => ({ ...prev, password: true }));
+    setTouched((prevState) => ({ ...prevState, password: true }));
     const validation = validatePassword(password);
     setPasswordError(validation.error);
   };
 
+  /**
+   * Handles confirm password blur.
+   * @return {void} No return value.
+   */
   const handleConfirmPasswordBlur = () => {
-    setTouched(prev => ({ ...prev, confirmPassword: true }));
+    setTouched((prevState) => ({ ...prevState, confirmPassword: true }));
     const validation = validatePasswordMatch(password, confirmPassword);
     setConfirmPasswordError(validation.error);
   };
 
-  // CHANGE: Enhanced validation before submission
-  const handleRegister = () => {
-    // CHANGE: Mark all fields as touched
-    setTouched({
-      name: true,
-      email: true,
-      password: true,
-      confirmPassword: true,
-    });
+  /**
+   * Handles toggle password visibility.
+   * @return {void} No return value.
+   */
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword((isVisible) => !isVisible);
+  };
 
-    // CHANGE: Validate all fields
+  /**
+   * Handles toggle confirm password visibility.
+   * @return {void} No return value.
+   */
+  const handleToggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword((isVisible) => !isVisible);
+  };
+
+  /**
+   * Handles register.
+   * @return {void} No return value.
+   */
+  const handleRegister = () => {
+    setTouched(TOUCHED_SUBMITTED_STATE);
+
     const nameValidation = validateName(name);
     const emailValidation = validateEmail(email);
     const passwordValidation = validatePassword(password);
-    const confirmPasswordValidation = validatePasswordMatch(password, confirmPassword);
+    const confirmPasswordValidation = validatePasswordMatch(
+      password,
+      confirmPassword,
+    );
 
     setNameError(nameValidation.error);
     setEmailError(emailValidation.error);
     setPasswordError(passwordValidation.error);
     setConfirmPasswordError(confirmPasswordValidation.error);
 
-    // CHANGE: Stop if validation fails
     if (
       !nameValidation.isValid ||
       !emailValidation.isValid ||
@@ -158,12 +261,18 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
     });
   };
 
-  // CHANGE: Check if form is valid
-  const isFormValid = () => {
+  /**
+   * Gets is form valid.
+   * @return {boolean} Whether the condition is met.
+   */
+  const getIsFormValid = () => {
     const nameValidation = validateName(name);
     const emailValidation = validateEmail(email);
     const passwordValidation = validatePassword(password);
-    const confirmPasswordValidation = validatePasswordMatch(password, confirmPassword);
+    const confirmPasswordValidation = validatePasswordMatch(
+      password,
+      confirmPassword,
+    );
 
     return (
       nameValidation.isValid &&
@@ -173,215 +282,429 @@ const RegisterScreen = ({ navigation, onAuthSuccess }) => {
     );
   };
 
+  const formIsValid = getIsFormValid();
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Create Account</Text>
-        
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, nameError && touched.name && styles.inputError]}
-            placeholder="Full Name"
-            value={name}
-            onChangeText={handleNameChange}
-            onBlur={handleNameBlur}
-          />
-          {nameError && touched.name && (
-            <Text style={styles.errorText}>{nameError}</Text>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, emailError && touched.email && styles.inputError]}
-            placeholder="Email"
-            value={email}
-            onChangeText={handleEmailChange}
-            onBlur={handleEmailBlur}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          {emailError && touched.email && (
-            <Text style={styles.errorText}>{emailError}</Text>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, passwordError && touched.password && styles.inputError]}
-            placeholder="Password"
-            value={password}
-            onChangeText={handlePasswordChange}
-            onBlur={handlePasswordBlur}
-            secureTextEntry
-          />
-          {passwordError && touched.password && (
-            <Text style={styles.errorText}>{passwordError}</Text>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, confirmPasswordError && touched.confirmPassword && styles.inputError]}
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChangeText={handleConfirmPasswordChange}
-            onBlur={handleConfirmPasswordBlur}
-            secureTextEntry
-          />
-          {confirmPasswordError && touched.confirmPassword && (
-            <Text style={styles.errorText}>{confirmPasswordError}</Text>
-          )}
-        </View>
-
-        <Text style={styles.label}>I want to:</Text>
-        <View style={styles.roleContainer}>
-          <TouchableOpacity
-            style={[styles.roleButton, role === 'buyer' && styles.roleButtonActive]}
-            onPress={() => setRole('buyer')}
-          >
-            <Text style={[styles.roleText, role === 'buyer' && styles.roleTextActive]}>
-              Buy Products
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.roleButton, role === 'seller' && styles.roleButtonActive]}
-            onPress={() => setRole('seller')}
-          >
-            <Text style={[styles.roleText, role === 'seller' && styles.roleTextActive]}>
-              Sell Products
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, !isFormValid() && styles.buttonDisabled]}
-          onPress={handleRegister}
-          disabled={loading || !isFormValid()}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="dark" />
+      <LinearGradient
+        colors={['#e0e7ff', '#f9fafb', '#fff']}
+        style={styles.gradient}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Create Account</Text>
-          )}
-        </TouchableOpacity>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.header}>
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.backButton}
+              >
+                <Ionicons name="arrow-back" size={24} color="#111827" />
+              </TouchableOpacity>
+              <Text style={styles.title}>Create Account</Text>
+              <Text style={styles.subtitle}>
+                Fill in your details to get started
+              </Text>
+            </View>
 
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.linkButton}
-        >
-          <Text style={styles.linkText}>
-            Already have an account? <Text style={styles.linkTextBold}>Login</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+            <View style={styles.form}>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    touched.name && nameError
+                      ? styles.inputErrorContainer
+                      : null,
+                  ]}
+                >
+                  <Ionicons
+                    name="person-outline"
+                    size={20}
+                    color={ICON_COLOR}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="John Doe"
+                    placeholderTextColor={PLACEHOLDER_COLOR}
+                    value={name}
+                    onChangeText={handleNameChange}
+                    onBlur={handleNameBlur}
+                  />
+                </View>
+                {touched.name && nameError && (
+                  <Text style={styles.errorText}>{nameError}</Text>
+                )}
+              </View>
+
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Email Address</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    touched.email && emailError
+                      ? styles.inputErrorContainer
+                      : null,
+                  ]}
+                >
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color={ICON_COLOR}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="john@example.com"
+                    placeholderTextColor={PLACEHOLDER_COLOR}
+                    value={email}
+                    onChangeText={handleEmailChange}
+                    onBlur={handleEmailBlur}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                </View>
+                {touched.email && emailError && (
+                  <Text style={styles.errorText}>{emailError}</Text>
+                )}
+              </View>
+
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    touched.password && passwordError
+                      ? styles.inputErrorContainer
+                      : null,
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={ICON_COLOR}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Min. 8 characters"
+                    placeholderTextColor={PLACEHOLDER_COLOR}
+                    value={password}
+                    onChangeText={handlePasswordChange}
+                    onBlur={handlePasswordBlur}
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity onPress={handleTogglePasswordVisibility}>
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color={ICON_COLOR}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {touched.password && passwordError && (
+                  <Text style={styles.errorText}>{passwordError}</Text>
+                )}
+              </View>
+
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Confirm Password</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    touched.confirmPassword && confirmPasswordError
+                      ? styles.inputErrorContainer
+                      : null,
+                  ]}
+                >
+                  <Ionicons
+                    name="shield-checkmark-outline"
+                    size={20}
+                    color={ICON_COLOR}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Repeat your password"
+                    placeholderTextColor={PLACEHOLDER_COLOR}
+                    value={confirmPassword}
+                    onChangeText={handleConfirmPasswordChange}
+                    onBlur={handleConfirmPasswordBlur}
+                    secureTextEntry={!showConfirmPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={handleToggleConfirmPasswordVisibility}
+                  >
+                    <Ionicons
+                      name={
+                        showConfirmPassword
+                          ? 'eye-off-outline'
+                          : 'eye-outline'
+                      }
+                      size={20}
+                      color={ICON_COLOR}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {touched.confirmPassword && confirmPasswordError && (
+                  <Text style={styles.errorText}>{confirmPasswordError}</Text>
+                )}
+              </View>
+
+              <Text style={styles.roleLabel}>I want to:</Text>
+              <View style={styles.roleContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    role === ROLES.BUYER ? styles.roleButtonActive : null,
+                  ]}
+                  onPress={() => setRole(ROLES.BUYER)}
+                >
+                  <Ionicons
+                    name="cart-outline"
+                    size={20}
+                    color={role === ROLES.BUYER ? '#1d4ed8' : ICON_COLOR}
+                    style={styles.roleIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.roleText,
+                      role === ROLES.BUYER ? styles.roleTextActive : null,
+                    ]}
+                  >
+                    Buy Products
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    role === ROLES.SELLER ? styles.roleButtonActive : null,
+                  ]}
+                  onPress={() => setRole(ROLES.SELLER)}
+                >
+                  <Ionicons
+                    name="storefront-outline"
+                    size={20}
+                    color={role === ROLES.SELLER ? '#1d4ed8' : ICON_COLOR}
+                    style={styles.roleIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.roleText,
+                      role === ROLES.SELLER ? styles.roleTextActive : null,
+                    ]}
+                  >
+                    Sell Products
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  !formIsValid || loading ? styles.buttonDisabled : null,
+                ]}
+                onPress={handleRegister}
+                disabled={loading || !formIsValid}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Create Account</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.linkButton}
+              >
+                <Text style={styles.linkText}>
+                  Already have an account?{' '}
+                  <Text style={styles.linkTextBold}>Sign In</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#e0e7ff',
+  },
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F8',
   },
-  content: {
-    padding: 24,
+  scrollContent: {
+    paddingHorizontal: 28,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    marginBottom: 32,
+  },
+  backButton: {
+    marginBottom: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   title: {
-    fontSize: 30,
-    fontWeight: '700',
-    marginBottom: 24,
+    fontSize: 32,
+    fontWeight: '800',
     color: '#111827',
+    letterSpacing: -0.5,
   },
-  // CHANGE: Add input container for error message spacing
+  subtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  form: {
+    width: '100%',
+  },
+  inputWrapper: {
+    marginBottom: 18,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   inputContainer: {
-    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#f3f4f6',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 54,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  inputErrorContainer: {
+    borderColor: '#ef4444',
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E6E8EB',
-    borderRadius: 14,
-    padding: 14,
-    fontSize: 15,
-    color: '#111827',
-  },
-  // CHANGE: Add error state styling
-  inputError: {
-    borderColor: '#EF4444',
-    borderWidth: 1.5,
-  },
-  // CHANGE: Add error text styling
-  errorText: {
-    color: '#EF4444',
-    fontSize: 12,
-    marginTop: 6,
-    marginLeft: 6,
-  },
-  label: {
+    flex: 1,
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-    marginTop: 5,
     color: '#111827',
+    fontWeight: '500',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 6,
+    marginLeft: 12,
+  },
+  roleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+    marginLeft: 4,
+    marginTop: 8,
   },
   roleContainer: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 32,
   },
   roleButton: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#E6E8EB',
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
     backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#f3f4f6',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   roleButtonActive: {
-    borderColor: '#2563EB',
-    backgroundColor: '#E8F0FF',
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+  },
+  roleIcon: {
+    marginBottom: 4,
   },
   roleText: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: '#6b7280',
     fontWeight: '600',
   },
   roleTextActive: {
-    color: '#1D4ED8',
+    color: '#1d4ed8',
   },
   button: {
-    backgroundColor: '#2563EB',
-    borderRadius: 14,
-    padding: 15,
+    backgroundColor: '#1e1b4b',
+    borderRadius: 16,
+    height: 58,
     alignItems: 'center',
-    marginTop: 10,
+    justifyContent: 'center',
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  // CHANGE: Add disabled button styling
   buttonDisabled: {
-    backgroundColor: '#AFC7FF',
-    opacity: 0.7,
+    backgroundColor: '#9ca3af',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
   },
   linkButton: {
-    marginTop: 20,
+    marginTop: 24,
     alignItems: 'center',
-    marginBottom: 30,
   },
   linkText: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 15,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   linkTextBold: {
-    color: '#2563EB',
-    fontWeight: '600',
+    color: '#2563eb',
+    fontWeight: '700',
   },
 });
-
-export default RegisterScreen;

@@ -1,4 +1,3 @@
-// AI Shopping Assistant - ChatBot Component
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
@@ -19,6 +18,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SEND_CHAT_MESSAGE } from '../graphql/mutations';
 
+/**
+ * AI assistant chat widget for product recommendations.
+ * @param {{navigation: object}} props Component props.
+ * @return {React.JSX.Element} Floating action button and chat modal.
+ */
 const ChatBot = ({ navigation }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [message, setMessage] = useState('');
@@ -40,10 +44,20 @@ const ChatBot = ({ navigation }) => {
 
     const [sendChatMessage, { loading }] = useMutation(SEND_CHAT_MESSAGE);
 
+    /**
+     * Generates a unique message identifier.
+     * @param {string} [suffix=''] Optional id suffix.
+     * @return {string} Unique message id.
+     */
     const createMessageId = (suffix = '') => {
         return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}${suffix}`;
     };
 
+    /**
+     * Formats a numeric value as currency.
+     * @param {number|string} value Price value.
+     * @return {string} Formatted price string.
+     */
     const formatCurrency = (value) => {
         const numeric = Number(value);
         if (!Number.isFinite(numeric)) {
@@ -52,6 +66,11 @@ const ChatBot = ({ navigation }) => {
         return `$${numeric.toFixed(2)}`;
     };
 
+    /**
+     * Removes low-value technical identifiers from assistant text.
+     * @param {string} text Raw text from backend.
+     * @return {string} Clean text without technical ids.
+     */
     const stripTechnicalIds = (text) => {
         if (typeof text !== 'string') {
             return '';
@@ -65,6 +84,11 @@ const ChatBot = ({ navigation }) => {
             .trim();
     };
 
+    /**
+     * Normalizes assistant text for display.
+     * @param {string} text Assistant response text.
+     * @return {string} Display-safe assistant text.
+     */
     const normalizeAssistantText = (text) => {
         const cleaned = stripTechnicalIds(text || '');
         if (!cleaned) {
@@ -79,6 +103,16 @@ const ChatBot = ({ navigation }) => {
             .trim();
     };
 
+    /**
+     * Extracts known assistant metadata flags.
+     * @param {object|null|undefined} payload Response payload.
+     * @return {{
+     *   latencyMs: number|null,
+     *   cacheHit: boolean,
+     *   safetyBlocked: boolean,
+     *   semanticUsed: boolean,
+     * }|null} Parsed metadata.
+     */
     const getAssistantMetadata = (payload) => {
         if (!payload) {
             return null;
@@ -101,7 +135,6 @@ const ChatBot = ({ navigation }) => {
         getUserId();
     }, []);
 
-    // Pulse animation for the chat button
     useEffect(() => {
         const pulse = Animated.loop(
             Animated.sequence([
@@ -181,13 +214,23 @@ const ChatBot = ({ navigation }) => {
         }
     };
 
+    /**
+     * Handles product press.
+     * @param {object} product Product object.
+     * @return {void} No return value.
+     */
     const handleProductPress = (product) => {
         setIsOpen(false);
         navigation.navigate('ProductDetail', { product });
     };
 
+    /**
+     * Renders rich text.
+     * @param {string} text Input text.
+     * @param {boolean} isUser Whether the message is from the user.
+     * @return {React.JSX.Element} Rendered element.
+     */
     const renderRichText = (text, isUser) => {
-        // Simple bold text renderer for **text**
         const parts = text.split(/(\*\*.*?\*\*)/g);
         return (
             <Text style={[styles.messageText, isUser ? styles.userText : styles.aiText]}>
@@ -205,6 +248,11 @@ const ChatBot = ({ navigation }) => {
         );
     };
 
+    /**
+     * Renders message.
+     * @param {object} params Callback parameters.
+     * @return {React.JSX.Element} Rendered element.
+     */
     const renderMessage = ({ item }) => {
         const isUser = item.role === 'user';
 
@@ -222,6 +270,11 @@ const ChatBot = ({ navigation }) => {
         );
     };
 
+    /**
+     * Renders product card.
+     * @param {object} product Product object.
+     * @return {React.JSX.Element} Rendered element.
+     */
     const renderProductCard = (product) => (
         <TouchableOpacity
             key={product.id || `${product.name || 'product'}_${String(product.basePrice || 0)}`}
@@ -242,6 +295,11 @@ const ChatBot = ({ navigation }) => {
         </TouchableOpacity>
     );
 
+    /**
+     * Renders item.
+     * @param {object} params Callback parameters.
+     * @return {React.JSX.Element} Rendered element.
+     */
     const renderItem = ({ item }) => (
         <View>
             {renderMessage({ item })}

@@ -1,5 +1,8 @@
-// CHANGE: Comprehensive location data for India and US with all states and major cities
 
+/**
+ * Hierarchical country/state/city data with postal code patterns.
+ * @type {Record<string, {states: Record<string, {cities: string[], zipPattern: RegExp}>}>}
+ */
 export const LOCATION_DATA = {
   India: {
     states: {
@@ -355,7 +358,11 @@ export const LOCATION_DATA = {
   },
 };
 
-// CHANGE: Helper function to get states for a country
+/**
+ * Returns a sorted list of states for a country.
+ * @param {string} country Country name key.
+ * @return {string[]} Sorted state names.
+ */
 export const getStatesForCountry = (country) => {
   if (!country || !LOCATION_DATA[country]) {
     return [];
@@ -363,7 +370,12 @@ export const getStatesForCountry = (country) => {
   return Object.keys(LOCATION_DATA[country].states).sort();
 };
 
-// CHANGE: Helper function to get cities for a state
+/**
+ * Returns a sorted list of cities for a specific country and state.
+ * @param {string} country Country name key.
+ * @param {string} state State name key.
+ * @return {string[]} Sorted city names.
+ */
 export const getCitiesForState = (country, state) => {
   if (!country || !state || !LOCATION_DATA[country]?.states[state]) {
     return [];
@@ -371,7 +383,13 @@ export const getCitiesForState = (country, state) => {
   return LOCATION_DATA[country].states[state].cities.sort();
 };
 
-// CHANGE: Helper function to validate ZIP code based on city
+/**
+ * Validates ZIP/PIN code against country and state pattern.
+ * @param {string} country Country name key.
+ * @param {string} state State name key.
+ * @param {string} zipCode Postal code value.
+ * @return {{isValid: boolean, error: string}} Validation result.
+ */
 export const validateZipCodeForCity = (country, state, zipCode) => {
   if (!country || !state || !zipCode) {
     return { isValid: false, error: 'Country, state, and ZIP code are required' };
@@ -387,7 +405,6 @@ export const validateZipCodeForCity = (country, state, zipCode) => {
     return { isValid: false, error: 'ZIP code is required' };
   }
 
-  // CHANGE: Validate against state-specific pattern
   if (!stateData.zipPattern.test(cleanZip)) {
     return {
       isValid: false,

@@ -4,8 +4,11 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
+    "start:clean": "expo start -c",
     "android": "expo start --android",
+    "android:clean": "expo start --android -c",
     "ios": "expo start --ios",
+    "ios:clean": "expo start --ios -c",
     "web": "expo start --web"
   },
   "dependencies": {
@@ -19,6 +22,7 @@
     "expo-file-system": "~16.0.9",
     "expo-font": "~11.10.3",
     "expo-image-picker": "~14.7.1",
+    "expo-linear-gradient": "~12.7.2",
     "expo-status-bar": "~1.11.1",
     "graphql": "^16.8.1",
     "he": "^1.2.0",

@@ -2,8 +2,8 @@ import { validateZipCodeForCity } from './locationData';
 
 /**
  * Email validation
- * @param {string} email - Email address to validate
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} email Email address to validate.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validateEmail = (email) => {
   if (!email || email.trim().length === 0) {
@@ -20,9 +20,9 @@ export const validateEmail = (email) => {
 
 /**
  * Password validation
- * @param {string} password - Password to validate
- * @param {object} options - Validation options
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} password Password to validate.
+ * @param {object} options Validation options.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validatePassword = (password, options = {}) => {
   const {
@@ -62,8 +62,8 @@ export const validatePassword = (password, options = {}) => {
 
 /**
  * Name validation
- * @param {string} name - Name to validate
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} name Name to validate.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validateName = (name) => {
   if (!name || name.trim().length === 0) {
@@ -88,9 +88,9 @@ export const validateName = (name) => {
 
 /**
  * Required field validation
- * @param {string} value - Value to validate
- * @param {string} fieldName - Name of the field for error message
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} value Value to validate.
+ * @param {string} fieldName Name of the field for error message.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validateRequired = (value, fieldName = 'This field') => {
   if (!value || value.trim().length === 0) {
@@ -102,8 +102,8 @@ export const validateRequired = (value, fieldName = 'This field') => {
 
 /**
  * Street address validation
- * @param {string} street - Street address to validate
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} street Street address to validate.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validateStreet = (street) => {
   if (!street || street.trim().length === 0) {
@@ -142,8 +142,8 @@ export const validateStreet = (street) => {
 
 /**
  * City validation
- * @param {string} city - City to validate
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} city City to validate.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validateCity = (city) => {
   if (!city || city.trim().length === 0) {
@@ -176,8 +176,8 @@ export const validateCity = (city) => {
 
 /**
  * State validation
- * @param {string} state - State to validate
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} state State to validate.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validateState = (state) => {
   if (!state || state.trim().length === 0) {
@@ -206,10 +206,10 @@ export const validateState = (state) => {
 
 /**
  * ZIP code validation with city-based pattern matching
- * @param {string} zipCode - ZIP code to validate
- * @param {string} country - Selected country
- * @param {string} state - Selected state
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} zipCode ZIP code to validate.
+ * @param {string} country Selected country.
+ * @param {string} state Selected state.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validateZipCode = (zipCode, country = null, state = null) => {
   if (!zipCode || zipCode.trim().length === 0) {
@@ -242,8 +242,8 @@ export const validateZipCode = (zipCode, country = null, state = null) => {
 
 /**
  * Country validation
- * @param {string} country - Country to validate
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} country Country to validate.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validateCountry = (country) => {
   if (!country || country.trim().length === 0) {
@@ -260,9 +260,9 @@ export const validateCountry = (country) => {
 
 /**
  * Password confirmation validation
- * @param {string} password - Original password
- * @param {string} confirmPassword - Confirmation password
- * @returns {object} { isValid: boolean, error: string }
+ * @param {string} password Original password.
+ * @param {string} confirmPassword Confirmation password.
+ * @return {object} { isValid: boolean, error: string }
  */
 export const validatePasswordMatch = (password, confirmPassword) => {
   if (!confirmPassword || confirmPassword.length === 0) {

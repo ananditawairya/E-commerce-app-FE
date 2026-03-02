@@ -16,6 +16,11 @@ import { GET_MY_CART, GET_SIMILAR_PRODUCTS, GET_PRODUCTS } from '../../graphql/q
 import { MaterialIcons } from '@expo/vector-icons';
 import ProductHorizontalList from '../../components/ProductHorizontalList';
 
+/**
+ * Product detail screen.
+ * @param {{route: {params: {product: object}}, navigation: object}} props Screen props.
+ * @return {React.JSX.Element} Product detail UI.
+ */
 const ProductDetailScreen = ({ route, navigation }) => {
   const { product } = route.params;
   const [selectedVariant, setSelectedVariant] = useState(
@@ -25,7 +30,6 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [userId, setUserId] = useState(null);
 
-  // CHANGE: Fetch all products to enrich similar products (simplified logic for now)
   const { data: allProductsData } = useQuery(GET_PRODUCTS, {
     variables: { limit: 100 },
   });
@@ -35,6 +39,16 @@ const ProductDetailScreen = ({ route, navigation }) => {
   });
 
   const [trackEvent] = useMutation(TRACK_EVENT);
+  /**
+   * Resets to login.
+   * @return {void} No return value.
+   */
+  const resetToLogin = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+  };
 
   React.useEffect(() => {
     const init = async () => {
@@ -49,13 +63,14 @@ const ProductDetailScreen = ({ route, navigation }) => {
             eventType: 'view',
             category: product.category,
           }
-        }).catch(err => console.error('Tracking error:', err));
+        }).catch((trackingError) => {
+          console.error('Tracking error:', trackingError);
+        });
       }
     };
     init();
   }, [product.id]);
 
-  // CHANGE: Set navigation header options with back button
   React.useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
@@ -108,12 +123,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 {
                   text: 'OK',
                   onPress: async () => {
-                    // CHANGE: Clear storage and reset navigation properly
                     await AsyncStorage.clear();
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Login' }],
-                    });
+                    resetToLogin();
                   },
                 },
               ]
@@ -132,20 +143,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
             {
               text: 'Logout',
               onPress: async () => {
-                // CHANGE: Properly clear storage and reset navigation to login
                 try {
                   await AsyncStorage.clear();
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Login' }],
-                  });
+                  resetToLogin();
                 } catch (clearError) {
                   console.error('Error clearing storage:', clearError);
-                  // CHANGE: Force navigation even if storage clear fails
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Login' }],
-                  });
+                  resetToLogin();
                 }
               },
             },
@@ -157,12 +160,19 @@ const ProductDetailScreen = ({ route, navigation }) => {
     },
   });
 
+  /**
+   * Handles calculate price.
+   * @return {number} Computed numeric value.
+   */
   const calculatePrice = () => {
     if (!selectedVariant) return product.basePrice;
     return product.basePrice + selectedVariant.priceModifier;
   };
 
-  // CHANGE: Check if selected variant or product is out of stock
+  /**
+   * Checks whether out of stock.
+   * @return {boolean} Whether the condition is met.
+   */
   const isOutOfStock = () => {
     if (selectedVariant) {
       return selectedVariant.stock === 0;
@@ -182,12 +192,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
           [
             {
               text: 'OK',
-              onPress: () => {
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Login' }],
-                });
-              },
+              onPress: resetToLogin,
             },
           ]
         );
@@ -229,7 +234,6 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
     addToCart({ variables });
 
-    // Track cart_add event
     if (userId) {
       trackEvent({
         variables: {
@@ -239,7 +243,9 @@ const ProductDetailScreen = ({ route, navigation }) => {
           category: product.category,
           metadata: JSON.stringify({ variantId: selectedVariant?.id, quantity })
         }
-      }).catch(err => console.error('Tracking error (cart_add):', err));
+      }).catch((trackingError) => {
+        console.error('Tracking error (cart_add):', trackingError);
+      });
     }
   };
 
@@ -323,7 +329,6 @@ const ProductDetailScreen = ({ route, navigation }) => {
           </>
         )}
 
-        {/* CHANGE: Conditionally render quantity controls or out of stock message */}
         {isOutOfStock() ? (
           <View style={styles.outOfStockContainer}>
             <MaterialIcons name="inventory-2" size={48} color="#ff3b30" />
@@ -351,7 +356,6 @@ const ProductDetailScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* CHANGE: Show different button based on stock availability */}
         {isOutOfStock() ? (
           <View style={styles.outOfStockButton}>
             <MaterialIcons name="block" size={20} color="#fff" />
@@ -371,7 +375,6 @@ const ProductDetailScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         )}
 
-        {/* Similar Products Section */}
         {similarData?.getSimilarProducts && (
           <ProductHorizontalList
             title="Similar Products"
@@ -486,7 +489,6 @@ const styles = StyleSheet.create({
     borderColor: '#2563EB',
     backgroundColor: '#EFF6FF',
   },
-  // CHANGE: Add styling for out of stock variants
   variantCardOutOfStock: {
     borderColor: '#ffcccc',
     backgroundColor: '#fff5f5',
@@ -501,7 +503,6 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 4,
   },
-  // CHANGE: Add styling for out of stock variant name
   variantNameOutOfStock: {
     color: '#999',
     textDecorationLine: 'line-through',
@@ -510,7 +511,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
   },
-  // CHANGE: Add styling for out of stock text
   outOfStockText: {
     color: '#EF4444',
     fontWeight: '600',
@@ -520,7 +520,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2563EB',
   },
-  // CHANGE: Add styling for out of stock variant price
   variantPriceOutOfStock: {
     color: '#999',
   },
@@ -549,7 +548,6 @@ const styles = StyleSheet.create({
     minWidth: 30,
     textAlign: 'center',
   },
-  // CHANGE: Add out of stock container styling
   outOfStockContainer: {
     marginTop: 20,
     marginBottom: 10,
@@ -586,7 +584,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // CHANGE: Add out of stock button styling
   outOfStockButton: {
     backgroundColor: '#EF4444',
     borderRadius: 14,

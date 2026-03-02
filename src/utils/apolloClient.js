@@ -10,16 +10,59 @@ const httpLink = createHttpLink({
   uri: `${API_BASE_URL}/graphql`,
 });
 
-// Token refresh state — prevents multiple simultaneous refresh requests
 let isRefreshing = false;
 let pendingRequests = [];
+const GRAPHQL_WARNING_THROTTLE_MS = 15_000;
+const SUPPRESSED_GRAPHQL_MESSAGES = new Set([
+  'Invalid credentials',
+  'Seller access required',
+]);
+const graphqlWarningLogTimestamps = new Map();
 
+/**
+ * Determines whether a GraphQL error should be logged.
+ * @param {{
+ *   message?: string,
+ *   operationName?: string,
+ *   path?: Array<string>|string,
+ * }} params Error metadata.
+ * @return {boolean} Whether to emit a warning log.
+ */
+const shouldLogGraphQLError = ({ message, operationName, path }) => {
+  const normalizedMessage = typeof message === 'string' ? message.trim() : '';
+  if (SUPPRESSED_GRAPHQL_MESSAGES.has(normalizedMessage)) {
+    return false;
+  }
+
+  const normalizedPath = Array.isArray(path)
+    ? path.join('.')
+    : (path || 'unknown');
+  const operationKey = operationName || 'anonymous';
+  const warningKey = `${operationKey}:${normalizedPath}:${normalizedMessage}`;
+  const now = Date.now();
+  const lastLoggedAt = graphqlWarningLogTimestamps.get(warningKey) || 0;
+
+  if (now - lastLoggedAt < GRAPHQL_WARNING_THROTTLE_MS) {
+    return false;
+  }
+
+  graphqlWarningLogTimestamps.set(warningKey, now);
+  return true;
+};
+
+/**
+ * Resolves all queued requests waiting for token refresh.
+ * @return {void}
+ */
 const resolvePendingRequests = () => {
   pendingRequests.forEach((callback) => callback());
   pendingRequests = [];
 };
 
-// Refresh the access token using the stored refresh token
+/**
+ * Refreshes the access token using the refresh token.
+ * @return {Promise<string>} New access token.
+ */
 const refreshAccessToken = async () => {
   try {
     const refreshToken = await AsyncStorage.getItem('refreshToken');
@@ -47,7 +90,6 @@ const refreshAccessToken = async () => {
       throw new Error('No access token in refresh response');
     }
 
-    // Store the new tokens
     await AsyncStorage.setItem('accessToken', data.accessToken);
     if (data.refreshToken) {
       await AsyncStorage.setItem('refreshToken', data.refreshToken);
@@ -57,7 +99,6 @@ const refreshAccessToken = async () => {
     return data.accessToken;
   } catch (error) {
     console.error('❌ Token refresh failed:', error.message);
-    // Clear all auth data — force re-login
     await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'userRole', 'userId']);
     throw error;
   }
@@ -94,7 +135,6 @@ const authLink = setContext(async (_, { headers }) => {
   }
 });
 
-// Retry link with exponential backoff for rate limit errors
 const retryLink = new RetryLink({
   delay: {
     initial: 1000,
@@ -108,7 +148,6 @@ const retryLink = new RetryLink({
         error?.networkError?.statusCode === 429;
       const isNetworkError = !!error?.networkError && !error?.result;
 
-      // Don't retry auth operations to avoid account lockout
       const isAuthOperation =
         operation.operationName === 'Login' ||
         operation.operationName === 'Register';
@@ -123,12 +162,19 @@ const retryLink = new RetryLink({
   },
 });
 
-// Error link with automatic token refresh on 401/403
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors) {
     graphQLErrors.forEach(({ message, locations, path, extensions }) => {
+      if (!shouldLogGraphQLError({
+        message,
+        path,
+        operationName: operation?.operationName,
+      })) {
+        return;
+      }
+
       console.warn(
-        `GraphQL error: Message: ${message}, Location: ${locations}, Path: ${path}`
+        `GraphQL error: Operation: ${operation?.operationName || 'anonymous'}, Message: ${message}, Location: ${locations}, Path: ${path}`
       );
       if (extensions) {
         console.warn('Error extensions:', extensions);
@@ -149,9 +195,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
       console.warn('⚠️ Rate limit exceeded');
     }
 
-    // Token expired or invalid — attempt refresh
     if (networkError.statusCode === 401 || networkError.statusCode === 403) {
-      // Don't try to refresh for login/register operations
       const isAuthOperation =
         operation.operationName === 'Login' ||
         operation.operationName === 'Register';
@@ -160,7 +204,6 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
         return;
       }
 
-      // If already refreshing, queue this request
       if (isRefreshing) {
         return fromPromise(
           new Promise((resolve) => {
@@ -174,7 +217,6 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
       return fromPromise(
         refreshAccessToken()
           .then((newToken) => {
-            // Update the operation's authorization header
             const oldHeaders = operation.getContext().headers;
             operation.setContext({
               headers: {

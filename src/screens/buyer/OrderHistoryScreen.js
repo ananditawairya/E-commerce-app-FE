@@ -6,12 +6,18 @@ import {
     FlatList,
     TouchableOpacity,
     ActivityIndicator,
-    Image,
 } from 'react-native';
 import { useQuery } from '@apollo/client';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GET_MY_ORDERS } from '../../graphql/queries';
 
+const HEADER_SPACER_WIDTH = 40;
+
+/**
+ * Buyer order history screen.
+ * @param {{navigation: object}} props Screen props.
+ * @return {React.JSX.Element} Order history list UI.
+ */
 const OrderHistoryScreen = ({ navigation }) => {
     const { data, loading, error, refetch } = useQuery(GET_MY_ORDERS, {
         notifyOnNetworkStatusChange: true,
@@ -22,6 +28,11 @@ const OrderHistoryScreen = ({ navigation }) => {
 
     const orders = data?.myOrders || [];
 
+    /**
+     * Gets status color.
+     * @param {string} status Order status.
+     * @return {string} Computed string value.
+     */
     const getStatusColor = (status) => {
         switch (status.toLowerCase()) {
             case 'delivered':
@@ -37,6 +48,11 @@ const OrderHistoryScreen = ({ navigation }) => {
         }
     };
 
+    /**
+     * Renders order item.
+     * @param {object} params Callback parameters.
+     * @return {React.JSX.Element} Rendered element.
+     */
     const renderOrderItem = ({ item }) => {
         const createdAtNumeric = Number(item.createdAt);
         const createdAt = Number.isNaN(createdAtNumeric)
@@ -108,7 +124,7 @@ const OrderHistoryScreen = ({ navigation }) => {
                     <MaterialIcons name="arrow-back" size={24} color="#1F2937" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Order History</Text>
-                <View style={{ width: 40 }} />
+                <View style={styles.headerSpacer} />
             </View>
 
             {loading && orders.length === 0 ? (
@@ -168,6 +184,9 @@ const styles = StyleSheet.create({
     },
     backButton: {
         padding: 8,
+    },
+    headerSpacer: {
+        width: HEADER_SPACER_WIDTH,
     },
     headerTitle: {
         fontSize: 18,

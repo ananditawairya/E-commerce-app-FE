@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,41 @@ import { useQuery, useMutation } from '@apollo/client';
 import { GET_SELLER_ORDERS, GET_SELLER_PRODUCTS } from '../../graphql/queries';
 import { UPDATE_ORDER_STATUS, CANCEL_ORDER } from '../../graphql/mutations';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/**
+ * Seller order management screen.
+ * @return {React.JSX.Element} Seller orders UI.
+ */
 const OrdersScreen = () => {
-  const { data, loading, error, refetch } = useQuery(GET_SELLER_ORDERS);
+  const [hasSellerAccess, setHasSellerAccess] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUserRole = async () => {
+      try {
+        const userRole = await AsyncStorage.getItem('userRole');
+        if (isMounted) {
+          setHasSellerAccess(userRole === 'seller');
+        }
+      } catch (error) {
+        if (isMounted) {
+          setHasSellerAccess(false);
+        }
+      }
+    };
+
+    loadUserRole();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const { data, loading, error, refetch } = useQuery(GET_SELLER_ORDERS, {
+    skip: hasSellerAccess !== true,
+  });
 
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, {
     refetchQueries: [{ query: GET_SELLER_ORDERS }],
@@ -26,11 +58,10 @@ const OrdersScreen = () => {
     },
   });
 
-  // CHANGE: Add GET_SELLER_PRODUCTS to refetchQueries to update stock display
   const [cancelOrder] = useMutation(CANCEL_ORDER, {
     refetchQueries: [
       { query: GET_SELLER_ORDERS },
-      { query: GET_SELLER_PRODUCTS } // CHANGE: Refetch seller products to update stock
+      { query: GET_SELLER_PRODUCTS },
     ],
     awaitRefetchQueries: true,
     onCompleted: () => {
@@ -41,6 +72,12 @@ const OrdersScreen = () => {
     },
   });
 
+  /**
+   * Handles status change.
+   * @param {string} orderId Order identifier.
+   * @param {string} currentStatus Current status value.
+   * @return {void} No return value.
+   */
   const handleStatusChange = (orderId, currentStatus) => {
     const statusFlow = {
       pending: 'confirmed',
@@ -57,6 +94,12 @@ const OrdersScreen = () => {
     updateOrderStatus({ variables: { orderId, status: nextStatus } });
   };
 
+  /**
+   * Handles cancel order.
+   * @param {string} orderId Order identifier.
+   * @param {string} currentStatus Current status value.
+   * @return {void} No return value.
+   */
   const handleCancelOrder = (orderId, currentStatus) => {
     if (currentStatus === 'cancelled' || currentStatus === 'delivered') {
       Alert.alert('Info', 'This order cannot be cancelled');
@@ -79,6 +122,11 @@ const OrdersScreen = () => {
     );
   };
 
+  /**
+   * Renders order.
+   * @param {object} params Callback parameters.
+   * @return {React.JSX.Element} Rendered element.
+   */
   const renderOrder = ({ item }) => {
     const myItems = item.items.filter((i) => i.sellerId);
     const createdAtValue = Number(item.createdAt);
@@ -140,9 +188,14 @@ const OrdersScreen = () => {
 
   return (
     <View style={styles.container}>
-      {loading ? (
+      {hasSellerAccess === null || loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : hasSellerAccess === false ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="lock-outline" size={50} color="#EF4444" />
+          <Text style={styles.emptyText}>Seller access required</Text>
         </View>
       ) : error ? (
         <View style={styles.emptyContainer}>

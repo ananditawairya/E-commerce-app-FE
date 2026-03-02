@@ -6,8 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 
 // Auth Screens
-import LoginScreen from '../screens/auth/LoginScreen';
-import RegisterScreen from '../screens/auth/RegisterScreen';
+import { LoginScreen } from '../screens/auth/LoginScreen';
+import { RegisterScreen } from '../screens/auth/RegisterScreen';
 
 // Buyer Screens
 import ProductListScreen from '../screens/buyer/ProductListScreen';
@@ -28,7 +28,11 @@ import apolloClient from '../utils/apolloClient';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// CHANGE: Pass logout callback to buyer tabs
+/**
+ * Buyer bottom tab navigator.
+ * @param {{onLogout: () => Promise<void>}} props Component props.
+ * @return {React.JSX.Element} Buyer tab navigation.
+ */
 const BuyerTabs = ({ onLogout }) => {
   return (
     <Tab.Navigator
@@ -56,7 +60,6 @@ const BuyerTabs = ({ onLogout }) => {
       })}
     >
       <Tab.Screen name="Products">
-        {/* CHANGE: Pass onLogout callback to ProductListScreen */}
         {(props) => <ProductListScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
       <Tab.Screen name="Cart" component={CartScreen} />
@@ -67,7 +70,11 @@ const BuyerTabs = ({ onLogout }) => {
   );
 };
 
-// CHANGE: Pass logout callback to seller tabs
+/**
+ * Seller bottom tab navigator.
+ * @param {{onLogout: () => Promise<void>}} props Component props.
+ * @return {React.JSX.Element} Seller tab navigation.
+ */
 const SellerTabs = ({ onLogout }) => {
   return (
     <Tab.Navigator
@@ -95,7 +102,6 @@ const SellerTabs = ({ onLogout }) => {
       })}
     >
       <Tab.Screen name="MyProducts">
-        {/* CHANGE: Pass onLogout callback to SellerProductsScreen */}
         {(props) => <SellerProductsScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
       <Tab.Screen name="Analytics" component={AnalyticsScreen} />
@@ -104,6 +110,10 @@ const SellerTabs = ({ onLogout }) => {
   );
 };
 
+/**
+ * Root app navigator handling auth and role-based routes.
+ * @return {React.JSX.Element|null} Navigation container or null while loading auth.
+ */
 const AppNavigator = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState(null);
@@ -113,6 +123,11 @@ const AppNavigator = () => {
     checkAuth();
   }, []);
 
+  /**
+   * Resolves user role from access token.
+   * @param {string} token Access token.
+   * @return {Promise<string>} Resolved user role.
+   */
   const resolveRoleFromToken = async (token) => {
     const response = await fetch(`${API_BASE_URL}/graphql`, {
       method: 'POST',
@@ -134,7 +149,10 @@ const AppNavigator = () => {
     return result.data.me.role;
   };
 
-  // Attempt to refresh the access token using the stored refresh token
+  /**
+   * Attempts to refresh an expired access token.
+   * @return {Promise<boolean>} True if refresh succeeds.
+   */
   const tryRefreshToken = async () => {
     try {
       const refreshToken = await AsyncStorage.getItem('refreshToken');
@@ -166,6 +184,10 @@ const AppNavigator = () => {
     }
   };
 
+  /**
+   * Checks persisted auth state and restores navigation session.
+   * @return {Promise<void>} Completion promise.
+   */
   const checkAuth = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
@@ -197,10 +219,10 @@ const AppNavigator = () => {
               console.log('⚠️ Role resolution failed after refresh:', refreshResolveError.message);
             }
           } else {
-            await AsyncStorage.clear();
-            console.log('⚠️ Refresh failed — user must re-login');
-          }
+          await AsyncStorage.clear();
+          console.log('Refresh failed. User must log in again.');
         }
+      }
       } else if (token) {
         // Role missing in storage, recover from token.
         try {
@@ -220,7 +242,10 @@ const AppNavigator = () => {
     }
   };
 
-  // CHANGE: Add authentication success handler to update state
+  /**
+   * Handles post-login auth state setup.
+   * @return {Promise<void>} Completion promise.
+   */
   const handleAuthSuccess = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
@@ -259,18 +284,21 @@ const AppNavigator = () => {
     }
   };
 
-  // CHANGE: Add logout handler to clear authentication state
+  /**
+   * Clears auth state and logs out the current user.
+   * @return {Promise<void>} Completion promise.
+   */
   const handleLogout = async () => {
     try {
       await AsyncStorage.clear();
       await apolloClient.clearStore();
       setIsAuthenticated(false);
       setUserRole(null);
-      // CHANGE: Don't use navigation.reset here - let state change trigger re-render
+
       console.log('✅ Logout successful - state cleared');
     } catch (error) {
       console.log('Logout error:', error);
-      // CHANGE: Force state reset even if storage clear fails
+
       setIsAuthenticated(false);
       setUserRole(null);
     }
@@ -286,25 +314,21 @@ const AppNavigator = () => {
         {!isAuthenticated ? (
           <>
             <Stack.Screen name="Login">
-              {/* CHANGE: Pass onAuthSuccess callback to LoginScreen */}
               {(props) => <LoginScreen {...props} onAuthSuccess={handleAuthSuccess} />}
             </Stack.Screen>
             <Stack.Screen name="Register">
-              {/* CHANGE: Pass onAuthSuccess callback to RegisterScreen */}
               {(props) => <RegisterScreen {...props} onAuthSuccess={handleAuthSuccess} />}
             </Stack.Screen>
           </>
         ) : userRole === 'buyer' ? (
           <>
             <Stack.Screen name="BuyerHome">
-              {/* CHANGE: Pass onLogout callback to BuyerTabs */}
               {(props) => <BuyerTabs {...props} onLogout={handleLogout} />}
             </Stack.Screen>
             <Stack.Screen
               name="ProductDetail"
               component={ProductDetailScreen}
               options={{
-                // CHANGE: Remove title and headerShown from here since ProductDetailScreen handles it
                 headerShown: false,
               }}
             />
@@ -326,7 +350,6 @@ const AppNavigator = () => {
         ) : (
           <>
             <Stack.Screen name="SellerHome">
-              {/* CHANGE: Pass onLogout callback to SellerTabs */}
               {(props) => <SellerTabs {...props} onLogout={handleLogout} />}
             </Stack.Screen>
             <Stack.Screen

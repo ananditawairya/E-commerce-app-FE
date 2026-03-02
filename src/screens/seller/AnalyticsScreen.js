@@ -1,23 +1,63 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Dimensions } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useQuery } from '@apollo/client';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { GET_SELLER_ANALYTICS } from '../../graphql/queries';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const chartWidth = Dimensions.get('window').width - 40;
 
-const rangeOptions = [
+const RANGE_OPTIONS = [
   { label: '7D', value: 7 },
   { label: '30D', value: 30 },
   { label: '90D', value: 90 },
 ];
 
-const formatCurrency = (value) => {
-  return `$${value.toFixed(2)}`;
-};
+/**
+ * Formats a numeric value as currency.
+ * @param {number} value Numeric amount.
+ * @return {string} Formatted currency string.
+ */
+const formatCurrency = (value) => `$${value.toFixed(2)}`;
 
+/**
+ * Seller analytics screen.
+ * @return {React.JSX.Element} Analytics charts and summary stats.
+ */
 const AnalyticsScreen = () => {
   const [days, setDays] = useState(7);
+  const [hasSellerAccess, setHasSellerAccess] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUserRole = async () => {
+      try {
+        const userRole = await AsyncStorage.getItem('userRole');
+        if (isMounted) {
+          setHasSellerAccess(userRole === 'seller');
+        }
+      } catch (error) {
+        if (isMounted) {
+          setHasSellerAccess(false);
+        }
+      }
+    };
+
+    loadUserRole();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const { data, loading, error, refetch } = useQuery(GET_SELLER_ANALYTICS, {
     variables: { days },
@@ -25,6 +65,7 @@ const AnalyticsScreen = () => {
     nextFetchPolicy: 'network-only',
     pollInterval: 5000,
     notifyOnNetworkStatusChange: true,
+    skip: hasSellerAccess !== true,
   });
 
   const analytics = data?.sellerAnalytics;
@@ -42,7 +83,7 @@ const AnalyticsScreen = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Analytics</Text>
         <View style={styles.rangeRow}>
-          {rangeOptions.map((opt) => (
+          {RANGE_OPTIONS.map((opt) => (
             <TouchableOpacity
               key={opt.value}
               style={[styles.rangeChip, days === opt.value && styles.rangeChipActive]}
@@ -59,9 +100,13 @@ const AnalyticsScreen = () => {
         </View>
       </View>
 
-      {loading && !analytics ? (
+      {hasSellerAccess === null || (loading && !analytics) ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color="#2563EB" />
+        </View>
+      ) : hasSellerAccess === false ? (
+        <View style={styles.loading}>
+          <Text style={styles.errorText}>Seller access required</Text>
         </View>
       ) : error ? (
         <View style={styles.loading}>

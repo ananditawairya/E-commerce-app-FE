@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,16 +14,47 @@ import { DELETE_PRODUCT } from '../../graphql/mutations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 
-// CHANGE: Accept onLogout prop from parent component
+/**
+ * Seller product list screen.
+ * @param {{
+ *   navigation: object,
+ *   onLogout?: () => Promise<void>,
+ * }} props Screen props.
+ * @return {React.JSX.Element} Seller product management UI.
+ */
 const SellerProductsScreen = ({ navigation, onLogout }) => {
+  const [hasSellerAccess, setHasSellerAccess] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUserRole = async () => {
+      try {
+        const userRole = await AsyncStorage.getItem('userRole');
+        if (isMounted) {
+          setHasSellerAccess(userRole === 'seller');
+        }
+      } catch (error) {
+        if (isMounted) {
+          setHasSellerAccess(false);
+        }
+      }
+    };
+
+    loadUserRole();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const { data, loading, error, refetch } = useQuery(GET_SELLER_PRODUCTS, {
-  // CHANGE: Always fetch fresh data from network
-  fetchPolicy: 'network-only',
-  errorPolicy: 'none',
-  notifyOnNetworkStatusChange: true,
-  // CHANGE: Poll every 5 seconds to catch stock updates from order cancellations
-  pollInterval: 5000,
-});
+    fetchPolicy: 'network-only',
+    errorPolicy: 'none',
+    notifyOnNetworkStatusChange: true,
+    pollInterval: 5000,
+    skip: hasSellerAccess !== true,
+  });
 
   const [deleteProduct] = useMutation(DELETE_PRODUCT, {
     refetchQueries: [{ query: GET_SELLER_PRODUCTS }],
@@ -35,7 +66,6 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
     },
   });
 
-  // CHANGE: Updated logout handler to use callback instead of navigation reset
   const handleLogout = async () => {
     Alert.alert(
       'Logout',
@@ -46,11 +76,9 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
-            // CHANGE: Use onLogout callback to trigger authentication state change
             if (onLogout) {
               await onLogout();
             } else {
-              // Fallback for cases where callback is not provided
               console.warn('No logout callback provided');
               await AsyncStorage.clear();
             }
@@ -60,6 +88,29 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
     );
   };
 
+  /**
+   * Handles navigate to add product.
+   * @return {void} No return value.
+   */
+  const handleNavigateToAddProduct = () => {
+    navigation.navigate('AddProduct');
+  };
+
+  /**
+   * Handles navigate to edit product.
+   * @param {object} product Product object.
+   * @return {void} No return value.
+   */
+  const handleNavigateToEditProduct = (product) => {
+    navigation.navigate('AddProduct', { product });
+  };
+
+  /**
+   * Handles delete.
+   * @param {string} id Entity identifier.
+   * @param {string} name Display name.
+   * @return {void} No return value.
+   */
   const handleDelete = (id, name) => {
     Alert.alert('Delete Product', `Are you sure you want to delete "${name}"?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -71,6 +122,11 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
     ]);
   };
 
+  /**
+   * Renders product.
+   * @param {object} params Callback parameters.
+   * @return {React.JSX.Element} Rendered element.
+   */
   const renderProduct = ({ item }) => (
     <View style={styles.productCard}>
       <View style={styles.productHeader}>
@@ -85,7 +141,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => navigation.navigate('AddProduct', { product: item })}
+            onPress={() => handleNavigateToEditProduct(item)}
           >
             <MaterialIcons name="edit" size={24} color="#007AFF" />
           </TouchableOpacity>
@@ -107,7 +163,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Products</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleLogout}
           accessibilityLabel="Logout"
           accessibilityHint="Logout from the application"
@@ -116,9 +172,20 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {hasSellerAccess === null || loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : hasSellerAccess === false ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="lock-outline" size={50} color="#EF4444" />
+          <Text style={styles.emptyText}>Seller access required</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       ) : error ? (
         <View style={styles.emptyContainer}>
@@ -148,7 +215,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
 
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => navigation.navigate('AddProduct')}
+        onPress={handleNavigateToAddProduct}
       >
         <MaterialIcons name="add" size={30} color="#fff" />
       </TouchableOpacity>

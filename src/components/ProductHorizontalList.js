@@ -8,12 +8,26 @@ import {
 } from 'react-native';
 import ProductCard from './ProductCard';
 
+/**
+ * Renders a horizontal list of products.
+ * @param {{
+ *   title: string,
+ *   products: Array<object>,
+ *   onProductPress: (product: object) => void,
+ *   loading: boolean,
+ * }} props Component props.
+ * @return {React.JSX.Element|null} List UI or null when no products.
+ */
 const ProductHorizontalList = ({ title, products, onProductPress, loading }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
                 <Text style={styles.title}>{title}</Text>
-                <ActivityIndicator size="small" color="#2563EB" style={{ marginTop: 10 }} />
+                <ActivityIndicator
+                    size="small"
+                    color="#2563EB"
+                    style={styles.loadingIndicator}
+                />
             </View>
         );
     }
@@ -22,6 +36,11 @@ const ProductHorizontalList = ({ title, products, onProductPress, loading }) => 
         return null;
     }
 
+    /**
+     * Renders item.
+     * @param {object} params Callback parameters.
+     * @return {React.JSX.Element} Rendered element.
+     */
     const renderItem = ({ item }) => (
         <ProductCard
             product={item}
@@ -53,6 +72,9 @@ const styles = StyleSheet.create({
         marginVertical: 18,
         paddingHorizontal: 20,
     },
+    loadingIndicator: {
+        marginTop: 10,
+    },
     title: {
         fontSize: 22,
         fontWeight: '800',
@@ -63,7 +85,7 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingHorizontal: 14,
-        paddingBottom: 10, // Added padding for shadows
+        paddingBottom: 10,
     },
     card: {
         width: 180,

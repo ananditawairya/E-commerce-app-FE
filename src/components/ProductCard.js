@@ -8,6 +8,11 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
+/**
+ * Formats a price value as USD currency.
+ * @param {number} value Numeric price value.
+ * @return {string} Formatted currency string.
+ */
 const formatCurrency = (value) => {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return '$0.00';
@@ -15,6 +20,11 @@ const formatCurrency = (value) => {
   return `$${value.toFixed(2)}`;
 };
 
+/**
+ * Builds inventory badge text and color styles from variant stock.
+ * @param {object} product Product object with optional variants.
+ * @return {{label: string, textColor: string, backgroundColor: string}} Badge metadata.
+ */
 const getInventoryBadge = (product) => {
   const totalStock = (product?.variants || []).reduce((sum, variant) => {
     return sum + (typeof variant.stock === 'number' ? variant.stock : 0);
@@ -43,6 +53,15 @@ const getInventoryBadge = (product) => {
   };
 };
 
+/**
+ * Displays product summary card.
+ * @param {{
+ *   product: object,
+ *   onPress: (product: object) => void,
+ *   style?: object|Array<object>,
+ * }} props Component props.
+ * @return {React.JSX.Element} Product card UI.
+ */
 const ProductCard = ({ product, onPress, style }) => {
   const [imageError, setImageError] = useState(false);
   const inventoryBadge = getInventoryBadge(product);

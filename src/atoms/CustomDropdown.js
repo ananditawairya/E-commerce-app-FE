@@ -14,6 +14,21 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+/**
+ * Custom selectable dropdown with modal picker.
+ * @param {{
+ *   value: string,
+ *   onValueChange: (value: string) => void,
+ *   items: Array<{label: string, value: string}>,
+ *   placeholder: string,
+ *   label?: string,
+ *   error?: string,
+ *   touched?: boolean,
+ *   enabled?: boolean,
+ *   icon?: string,
+ * }} props Component props.
+ * @return {React.JSX.Element} Dropdown field and modal picker.
+ */
 const CustomDropdown = ({
   value,
   onValueChange,
@@ -37,6 +52,10 @@ const CustomDropdown = ({
     item.label.toLowerCase().includes(searchText.toLowerCase())
   );
 
+  /**
+   * Opens modal.
+   * @return {void} No return value.
+   */
   const openModal = () => {
     if (!enabled) return;
     setIsOpen(true);
@@ -54,6 +73,10 @@ const CustomDropdown = ({
     ]).start();
   };
 
+  /**
+   * Closes modal.
+   * @return {void} No return value.
+   */
   const closeModal = () => {
     Animated.parallel([
       Animated.timing(slideAnim, {
@@ -72,11 +95,21 @@ const CustomDropdown = ({
     });
   };
 
+  /**
+   * Handles select.
+   * @param {string} itemValue Selected item value.
+   * @return {void} No return value.
+   */
   const handleSelect = (itemValue) => {
     onValueChange(itemValue);
     closeModal();
   };
 
+  /**
+   * Renders item.
+   * @param {object} params Callback parameters.
+   * @return {React.JSX.Element} Rendered element.
+   */
   const renderItem = ({ item }) => {
     const isSelected = item.value === value;
     return (
@@ -148,7 +181,7 @@ const CustomDropdown = ({
           activeOpacity={1}
           onPress={closeModal}
         >
-          <Animated.View style={{ opacity: fadeAnim, flex: 1 }} />
+          <Animated.View style={[styles.modalOverlayFiller, { opacity: fadeAnim }]} />
         </TouchableOpacity>
 
         <Animated.View
@@ -240,6 +273,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalOverlayFiller: {
+    flex: 1,
   },
   modalContent: {
     position: 'absolute',

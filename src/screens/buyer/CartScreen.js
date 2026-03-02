@@ -14,6 +14,16 @@ import { UPDATE_CART_ITEM, REMOVE_FROM_CART, TRACK_EVENT } from '../../graphql/m
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const ROUTES = {
+  CHECKOUT: 'Checkout',
+  PRODUCTS: 'Products',
+};
+
+/**
+ * Buyer cart screen.
+ * @param {{navigation: object}} props Screen props.
+ * @return {React.JSX.Element} Cart UI with checkout actions.
+ */
 const CartScreen = ({ navigation }) => {
   const [userId, setUserId] = React.useState(null);
 
@@ -37,6 +47,13 @@ const CartScreen = ({ navigation }) => {
 
   const [trackEvent] = useMutation(TRACK_EVENT);
 
+  /**
+   * Handles update quantity.
+   * @param {string} productId Product identifier.
+   * @param {string} variantId Variant identifier.
+   * @param {number} newQuantity New quantity value.
+   * @return {void} No return value.
+   */
   const handleUpdateQuantity = (productId, variantId, newQuantity) => {
     if (newQuantity === 0) {
       handleRemoveItem(productId, variantId);
@@ -48,6 +65,12 @@ const CartScreen = ({ navigation }) => {
     });
   };
 
+  /**
+   * Handles remove item.
+   * @param {string} productId Product identifier.
+   * @param {string} variantId Variant identifier.
+   * @return {void} No return value.
+   */
   const handleRemoveItem = (productId, variantId) => {
     Alert.alert('Remove Item', 'Are you sure you want to remove this item?', [
       { text: 'Cancel', style: 'cancel' },
@@ -66,13 +89,36 @@ const CartScreen = ({ navigation }) => {
                 eventType: 'cart_remove',
                 metadata: JSON.stringify({ variantId })
               }
-            }).catch(err => console.error('Tracking error (cart_remove):', err));
+            }).catch((trackingError) => {
+              console.error('Tracking error (cart_remove):', trackingError);
+            });
           }
         },
       },
     ]);
   };
 
+  /**
+   * Handles navigate to products.
+   * @return {void} No return value.
+   */
+  const handleNavigateToProducts = () => {
+    navigation.navigate(ROUTES.PRODUCTS);
+  };
+
+  /**
+   * Handles navigate to checkout.
+   * @return {void} No return value.
+   */
+  const handleNavigateToCheckout = () => {
+    navigation.navigate(ROUTES.CHECKOUT);
+  };
+
+  /**
+   * Renders cart item.
+   * @param {object} params Callback parameters.
+   * @return {React.JSX.Element} Rendered element.
+   */
   const renderCartItem = ({ item }) => (
     <View style={styles.cartItem}>
       <View style={styles.itemInfo}>
@@ -131,7 +177,7 @@ const CartScreen = ({ navigation }) => {
           <Text style={styles.emptyText}>Your cart is empty</Text>
           <TouchableOpacity
             style={styles.shopButton}
-            onPress={() => navigation.navigate('Products')}
+            onPress={handleNavigateToProducts}
           >
             <Text style={styles.shopButtonText}>Start Shopping</Text>
           </TouchableOpacity>
@@ -154,7 +200,7 @@ const CartScreen = ({ navigation }) => {
             </View>
             <TouchableOpacity
               style={styles.checkoutButton}
-              onPress={() => navigation.navigate('Checkout')}
+              onPress={handleNavigateToCheckout}
             >
               <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
             </TouchableOpacity>

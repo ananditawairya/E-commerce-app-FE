@@ -1,8 +1,10 @@
-// mobile/src/graphql/queries.js
-
 import { gql } from '@apollo/client';
 
-// CHANGE: Enhanced GET_PRODUCTS to include formattedDescription and effectivePrice for variants
+/**
+ * GraphQL query definitions used by the mobile frontend.
+ */
+
+/** Fetches product listings with filters and pagination. */
 export const GET_PRODUCTS = gql`
   query GetProducts(
     $search: String
@@ -50,7 +52,7 @@ export const GET_PRODUCTS = gql`
   }
 `;
 
-// CHANGE: Enhanced GET_PRODUCT to include all variant fields and formatted description
+/** Fetches one product by identifier. */
 export const GET_PRODUCT = gql`
   query GetProduct($id: ID!) {
     product(id: $id) {
@@ -80,12 +82,14 @@ export const GET_PRODUCT = gql`
   }
 `;
 
+/** Fetches all available product categories. */
 export const GET_CATEGORIES = gql`
   query GetCategories {
     categories
   }
 `;
 
+/** Fetches the currently authenticated user profile. */
 export const ME = gql`
   query Me($token: String!) {
     me(token: $token) {
@@ -106,6 +110,7 @@ export const ME = gql`
   }
 `;
 
+/** Fetches the authenticated buyer cart. */
 export const GET_MY_CART = gql`
   query GetMyCart {
     myCart {
@@ -125,6 +130,7 @@ export const GET_MY_CART = gql`
   }
 `;
 
+/** Fetches order history for the authenticated buyer. */
 export const GET_MY_ORDERS = gql`
   query GetMyOrders {
     myOrders {
@@ -156,7 +162,7 @@ export const GET_MY_ORDERS = gql`
   }
 `;
 
-// CHANGE: Enhanced GET_SELLER_PRODUCTS to include all product and variant fields
+/** Fetches products owned by the authenticated seller. */
 export const GET_SELLER_PRODUCTS = gql`
   query GetSellerProducts {
     sellerProducts {
@@ -187,6 +193,7 @@ export const GET_SELLER_PRODUCTS = gql`
   }
 `;
 
+/** Fetches orders for the authenticated seller. */
 export const GET_SELLER_ORDERS = gql`
   query GetSellerOrders {
     sellerOrders {
