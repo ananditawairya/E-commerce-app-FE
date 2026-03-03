@@ -55,7 +55,7 @@ const UNKNOWN_ERROR_MESSAGE = 'Unknown error';
  * }} props Screen props.
  * @return {React.JSX.Element} Login screen UI.
  */
-export function LoginScreen({ navigation, onAuthSuccess }) {
+export function LoginScreen({ navigation, onAuthSuccess, onGuestLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -318,6 +318,13 @@ export function LoginScreen({ navigation, onAuthSuccess }) {
                     <Text style={styles.linkTextBold}>Create Account</Text>
                   </Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={onGuestLogin}
+                  style={styles.guestButton}
+                >
+                  <Text style={styles.guestButtonText}>Browse as Guest</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -440,5 +447,19 @@ const styles = StyleSheet.create({
   linkTextBold: {
     color: '#2563eb',
     fontWeight: '700',
+  },
+  guestButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestButtonText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '600',
   },
 });

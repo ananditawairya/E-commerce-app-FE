@@ -91,7 +91,7 @@ function getStatusCode(error) {
  * }} props Screen props.
  * @return {React.JSX.Element} Product list screen UI.
  */
-const ProductListScreen = ({ navigation, onLogout }) => {
+const ProductListScreen = ({ navigation, onLogout, isGuest, onSignIn }) => {
   const PAGINATION_RATE_LIMIT_COOLDOWN_MS = 20_000;
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
@@ -127,12 +127,16 @@ const ProductListScreen = ({ navigation, onLogout }) => {
 
   React.useEffect(() => {
     const getUserId = async () => {
+      if (isGuest) {
+        setUserId(null);
+        return;
+      }
       const storedUserId = await AsyncStorage.getItem('userId');
       setUserId(storedUserId);
     };
 
     getUserId();
-  }, []);
+  }, [isGuest]);
 
   React.useEffect(() => {
     setHasMore(true);
@@ -215,17 +219,20 @@ const ProductListScreen = ({ navigation, onLogout }) => {
 
   const { data: recData, loading: recLoading } = useQuery(GET_RECOMMENDATIONS, {
     variables: { userId, limit: 10 },
-    skip: !userId,
+    skip: !userId || isGuest,
   });
 
   const { data: trendingData, loading: trendingLoading } = useQuery(
     GET_TRENDING_PRODUCTS,
     {
       variables: { limit: 10 },
+      skip: isGuest,
     }
   );
 
-  const { data: categoriesData } = useQuery(GET_CATEGORIES);
+  const { data: categoriesData } = useQuery(GET_CATEGORIES, {
+    skip: isGuest,
+  });
   const {
     data: suggestionsData,
     loading: suggestionsLoading,
@@ -235,7 +242,7 @@ const ProductListScreen = ({ navigation, onLogout }) => {
       categories: selectedCategories.length ? selectedCategories : null,
       limit: 8,
     },
-    skip: !shouldFetchSuggestions,
+    skip: !shouldFetchSuggestions || isGuest,
     fetchPolicy: 'no-cache',
   });
 
@@ -597,11 +604,12 @@ const ProductListScreen = ({ navigation, onLogout }) => {
     <>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <ProductListHeaderSection
+          isGuest={isGuest}
           appliedFilterCount={appliedFilterCount}
           isSuggestionsLoading={suggestionsLoading}
           onClearAllFilters={clearAllFilters}
           onClearSearch={handleClearSearch}
-          onLogout={handleLogout}
+          onLogout={isGuest ? onSignIn : handleLogout}
           onOpenFilterModal={handleOpenFilterModal}
           onOpenSortModal={handleOpenSortModal}
           onSearchBlur={() => setSearchFocused(false)}

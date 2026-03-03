@@ -35,7 +35,7 @@ const formatCurrency = (value) => {
  * @param {{route: {params: {product: object}}, navigation: object}} props Screen props.
  * @return {React.JSX.Element} Product detail UI.
  */
-const ProductDetailScreen = ({ route, navigation }) => {
+const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
   const insets = useSafeAreaInsets();
   const { product } = route.params;
   const [selectedVariant, setSelectedVariant] = useState(
@@ -66,6 +66,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
   const { data: similarData, loading: similarLoading } = useQuery(GET_SIMILAR_PRODUCTS, {
     variables: { productId: product.id, limit: 10 },
+    skip: isGuest,
   });
 
   const [trackEvent] = useMutation(TRACK_EVENT);
@@ -82,9 +83,23 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
   React.useEffect(() => {
     const init = async () => {
-      const storedUserId = await AsyncStorage.getItem('userId');
-      setUserId(storedUserId);
+      if (isGuest) {
+        setUserId(null);
+        return;
+      }
 
+      const [storedUserId, storedToken] = await Promise.all([
+        AsyncStorage.getItem('userId'),
+        AsyncStorage.getItem('accessToken'),
+      ]);
+      const hasToken = typeof storedToken === 'string' && storedToken.trim().length > 0;
+
+      if (!storedUserId || !hasToken) {
+        setUserId(null);
+        return;
+      }
+
+      setUserId(storedUserId);
       if (storedUserId) {
         trackEvent({
           variables: {
@@ -99,7 +114,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
       }
     };
     init();
-  }, [product.id]);
+  }, [isGuest, product.category, product.id, trackEvent]);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -194,17 +209,18 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
   const handleAddToCart = async () => {
     try {
-      const token = await AsyncStorage.getItem('accessToken');
+      const rawToken = await AsyncStorage.getItem('accessToken');
       const userId = await AsyncStorage.getItem('userId');
+      const hasToken = typeof rawToken === 'string' && rawToken.trim().length > 0;
 
-      if (!token || !userId) {
+      if (!hasToken || !userId || isGuest) {
         Alert.alert(
           'Please Log In',
           'You need to be logged in to add items to cart.',
           [
             {
               text: 'OK',
-              onPress: resetToLogin,
+              onPress: isGuest ? onSignIn : resetToLogin,
             },
           ]
         );
@@ -270,171 +286,173 @@ const ProductDetailScreen = ({ route, navigation }) => {
           { paddingBottom: insets.bottom + 24 },
         ]}
       >
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          onPress={navigateBackOrHome}
-          style={styles.topBarBackButton}
-          accessibilityLabel="Go back to products"
-        >
-          <MaterialIcons name="arrow-back" size={24} color="#2563EB" />
-        </TouchableOpacity>
-
-        <View style={styles.topBarTextBlock}>
-          <Text style={styles.topBarTitle}>Product Details</Text>
-          <Text style={styles.topBarSubtitle} numberOfLines={1}>
-            {product.category || 'Catalog item'}
-          </Text>
-        </View>
-
-        <View style={styles.topBarSpacer} />
-      </View>
-
-      <View style={styles.mediaCard}>
-        {product.images && product.images.length > 0 ? (
-          <Image
-            source={{ uri: product.images[currentImageIndex] }}
-            style={styles.mainImage}
-          />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <MaterialIcons name="image" size={80} color="#ccc" />
-          </View>
-        )}
-      </View>
-
-      {product.images && product.images.length > 1 && (
-        <View style={styles.imageIndicators}>
-          {product.images.map((_, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.indicator,
-                currentImageIndex === index && styles.indicatorActive,
-              ]}
-              onPress={() => setCurrentImageIndex(index)}
-            />
-          ))}
-        </View>
-      )}
-
-      <View style={styles.content}>
-        <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryBadgeText}>{product.category}</Text>
-        </View>
-        <Text
-          style={styles.price}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.72}
-        >
-          {formatCurrency(calculatePrice())}
-        </Text>
-
-        <Text style={styles.sectionTitle}>Description</Text>
-        <Text style={styles.description}>{product.description}</Text>
-
-        {product.variants && product.variants.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Select Variant</Text>
-            {product.variants.map((variant) => (
-              <TouchableOpacity
-                key={variant.id}
-                style={[
-                  styles.variantCard,
-                  selectedVariant?.id === variant.id && styles.variantCardActive,
-                  variant.stock === 0 && styles.variantCardOutOfStock,
-                ]}
-                onPress={() => {
-                  setSelectedVariant(variant);
-                  setQuantity(1);
-                }}
-                disabled={variant.stock === 0}
-              >
-                <View style={styles.variantInfo}>
-                  <Text style={[
-                    styles.variantName,
-                    variant.stock === 0 && styles.variantNameOutOfStock
-                  ]}>
-                    {variant.name}
-                  </Text>
-                  <Text style={[
-                    styles.variantStock,
-                    variant.stock === 0 && styles.outOfStockText
-                  ]}>
-                    {variant.stock === 0 ? 'Out of Stock' : `Stock: ${variant.stock}`}
-                  </Text>
-                </View>
-                <Text style={[
-                  styles.variantPrice,
-                  variant.stock === 0 && styles.variantPriceOutOfStock
-                ]}>
-                  {variant.priceModifier >= 0 ? '+' : ''}
-                  ${variant.priceModifier.toFixed(2)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-
-        {isOutOfStock() ? (
-          <View style={styles.outOfStockContainer}>
-            <MaterialIcons name="inventory-2" size={48} color="#ff3b30" />
-            <Text style={styles.outOfStockMessage}>This item is currently out of stock</Text>
-            <Text style={styles.outOfStockSubtext}>Please check back later or select a different variant</Text>
-          </View>
-        ) : (
-          <View style={styles.quantityContainer}>
-            <Text style={styles.sectionTitle}>Quantity</Text>
-            <View style={styles.quantityControls}>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => setQuantity(Math.max(1, quantity - 1))}
-              >
-                <MaterialIcons name="remove" size={20} color="#2563EB" />
-              </TouchableOpacity>
-              <Text style={styles.quantityText}>{quantity}</Text>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => setQuantity(quantity + 1)}
-              >
-                <MaterialIcons name="add" size={20} color="#2563EB" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {isOutOfStock() ? (
-          <View style={styles.outOfStockButton}>
-            <MaterialIcons name="block" size={20} color="#fff" />
-            <Text style={styles.outOfStockButtonText}>Out of Stock</Text>
-          </View>
-        ) : (
+        <View style={styles.topBar}>
           <TouchableOpacity
-            style={styles.addToCartButton}
-            onPress={handleAddToCart}
-            disabled={loading}
+            onPress={navigateBackOrHome}
+            style={styles.topBarBackButton}
+            accessibilityLabel="Go back to products"
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.addToCartText}>Add to Cart</Text>
-            )}
+            <MaterialIcons name="arrow-back" size={24} color="#2563EB" />
           </TouchableOpacity>
+
+          <View style={styles.topBarTextBlock}>
+            <Text style={styles.topBarTitle}>Product Details</Text>
+            <Text style={styles.topBarSubtitle} numberOfLines={1}>
+              {product.category || 'Catalog item'}
+            </Text>
+          </View>
+
+          <View style={styles.topBarSpacer} />
+        </View>
+
+        <View style={styles.mediaCard}>
+          {product.images && product.images.length > 0 ? (
+            <Image
+              source={{ uri: product.images[currentImageIndex] }}
+              style={styles.mainImage}
+            />
+          ) : (
+            <View style={styles.placeholderImage}>
+              <MaterialIcons name="image" size={80} color="#ccc" />
+            </View>
+          )}
+        </View>
+
+        {product.images && product.images.length > 1 && (
+          <View style={styles.imageIndicators}>
+            {product.images.map((_, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.indicator,
+                  currentImageIndex === index && styles.indicatorActive,
+                ]}
+                onPress={() => setCurrentImageIndex(index)}
+              />
+            ))}
+          </View>
         )}
 
-        {similarData?.getSimilarProducts && (
-          <ProductHorizontalList
-            title="Similar Products"
-            products={similarData.getSimilarProducts.map(rec => {
-              const enriched = allProductsData?.products?.find(p => p.id === rec.productId);
-              return enriched ? { ...enriched, ...rec } : null;
-            }).filter(p => p !== null)}
-            onProductPress={(p) => navigation.push('ProductDetail', { product: p })}
-            loading={similarLoading}
-          />
-        )}
-      </View>
+        <View style={styles.content}>
+          <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryBadgeText}>{product.category}</Text>
+          </View>
+          <Text
+            style={styles.price}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            {formatCurrency(calculatePrice())}
+          </Text>
+
+          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.description}>{product.description}</Text>
+
+          {product.variants && product.variants.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Select Variant</Text>
+              {product.variants.map((variant) => (
+                <TouchableOpacity
+                  key={variant.id}
+                  style={[
+                    styles.variantCard,
+                    selectedVariant?.id === variant.id && styles.variantCardActive,
+                    variant.stock === 0 && styles.variantCardOutOfStock,
+                  ]}
+                  onPress={() => {
+                    setSelectedVariant(variant);
+                    setQuantity(1);
+                  }}
+                  disabled={variant.stock === 0}
+                >
+                  <View style={styles.variantInfo}>
+                    <Text style={[
+                      styles.variantName,
+                      variant.stock === 0 && styles.variantNameOutOfStock
+                    ]}>
+                      {variant.name}
+                    </Text>
+                    <Text style={[
+                      styles.variantStock,
+                      variant.stock === 0 && styles.outOfStockText
+                    ]}>
+                      {variant.stock === 0 ? 'Out of Stock' : `Stock: ${variant.stock}`}
+                    </Text>
+                  </View>
+                  <Text style={[
+                    styles.variantPrice,
+                    variant.stock === 0 && styles.variantPriceOutOfStock
+                  ]}>
+                    {variant.priceModifier >= 0 ? '+' : ''}
+                    ${variant.priceModifier.toFixed(2)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+
+          {isOutOfStock() ? (
+            <View style={styles.outOfStockContainer}>
+              <MaterialIcons name="inventory-2" size={48} color="#ff3b30" />
+              <Text style={styles.outOfStockMessage}>This item is currently out of stock</Text>
+              <Text style={styles.outOfStockSubtext}>Please check back later or select a different variant</Text>
+            </View>
+          ) : (
+            <View style={styles.quantityContainer}>
+              <Text style={styles.sectionTitle}>Quantity</Text>
+              <View style={styles.quantityControls}>
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={() => setQuantity(Math.max(1, quantity - 1))}
+                >
+                  <MaterialIcons name="remove" size={20} color="#2563EB" />
+                </TouchableOpacity>
+                <Text style={styles.quantityText}>{quantity}</Text>
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={() => setQuantity(quantity + 1)}
+                >
+                  <MaterialIcons name="add" size={20} color="#2563EB" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {isOutOfStock() ? (
+            <View style={styles.outOfStockButton}>
+              <MaterialIcons name="block" size={20} color="#fff" />
+              <Text style={styles.outOfStockButtonText}>Out of Stock</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.addToCartButton}
+              onPress={handleAddToCart}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.addToCartText}>
+                  {isGuest ? 'Sign In to Add to Cart' : 'Add to Cart'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {similarData?.getSimilarProducts && (
+            <ProductHorizontalList
+              title="Similar Products"
+              products={similarData.getSimilarProducts.map(rec => {
+                const enriched = allProductsData?.products?.find(p => p.id === rec.productId);
+                return enriched ? { ...enriched, ...rec } : null;
+              }).filter(p => p !== null)}
+              onProductPress={(p) => navigation.push('ProductDetail', { product: p })}
+              loading={similarLoading}
+            />
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

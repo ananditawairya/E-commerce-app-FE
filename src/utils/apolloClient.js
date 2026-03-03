@@ -17,6 +17,17 @@ const SUPPRESSED_GRAPHQL_MESSAGES = new Set([
   'Invalid credentials',
   'Seller access required',
 ]);
+const NO_REFRESH_OPERATION_NAMES = new Set([
+  'Login',
+  'Register',
+  'GetProducts',
+  'GetProduct',
+  'GetCategories',
+  'GetSearchSuggestions',
+  'GetTrendingProducts',
+  'GetSimilarProducts',
+  'SendChatMessage',
+]);
 const graphqlWarningLogTimestamps = new Map();
 
 /**
@@ -61,11 +72,17 @@ const resolvePendingRequests = () => {
 
 /**
  * Refreshes the access token using the refresh token.
+ * @param {string=} refreshTokenOverride Refresh token value when already loaded.
  * @return {Promise<string>} New access token.
  */
-const refreshAccessToken = async () => {
+const refreshAccessToken = async (refreshTokenOverride) => {
   try {
-    const refreshToken = await AsyncStorage.getItem('refreshToken');
+    const rawRefreshToken = typeof refreshTokenOverride === 'string'
+      ? refreshTokenOverride
+      : await AsyncStorage.getItem('refreshToken');
+    const refreshToken = typeof rawRefreshToken === 'string'
+      ? rawRefreshToken.trim()
+      : '';
 
     if (!refreshToken) {
       throw new Error('No refresh token available');
@@ -178,7 +195,8 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
   }
 
   if (networkError) {
-    console.warn(`Network error: ${networkError}`);
+    const operationName = operation?.operationName || 'anonymous';
+    console.warn(`Network error: Operation: ${operationName}, ${networkError}`);
     if (networkError.statusCode) {
       console.warn(`Status Code: ${networkError.statusCode}`);
     }
@@ -191,49 +209,52 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
     }
 
     if (networkError.statusCode === 401 || networkError.statusCode === 403) {
-      const isAuthOperation =
-        operation.operationName === 'Login' ||
-        operation.operationName === 'Register';
-
-      if (isAuthOperation) {
-        return;
-      }
-
-      if (isRefreshing) {
-        return fromPromise(
-          new Promise((resolve) => {
-            pendingRequests.push(() => resolve());
-          })
-        ).flatMap(() => forward(operation));
-      }
-
-      isRefreshing = true;
+      const refreshOperationName = operation?.operationName || '';
+      const isNonRefreshOperation = NO_REFRESH_OPERATION_NAMES.has(refreshOperationName);
 
       return fromPromise(
-        refreshAccessToken()
-          .then((newToken) => {
-            const oldHeaders = operation.getContext().headers;
-            operation.setContext({
-              headers: {
-                ...oldHeaders,
-                authorization: `Bearer ${newToken}`,
-              },
-            });
-
-            resolvePendingRequests();
-            return newToken;
-          })
-          .catch((error) => {
-            pendingRequests = [];
-            console.error('❌ Token refresh failed, user must re-login:', error.message);
-            return null;
-          })
-          .finally(() => {
-            isRefreshing = false;
-          })
+        AsyncStorage.getItem('refreshToken').then((storedRefreshToken) => (
+          typeof storedRefreshToken === 'string' ? storedRefreshToken.trim() : ''
+        ))
       )
-        .filter((value) => Boolean(value))
-        .flatMap(() => forward(operation));
+        .filter((refreshToken) => !isNonRefreshOperation && Boolean(refreshToken))
+        .flatMap((refreshToken) => {
+          if (isRefreshing) {
+            return fromPromise(
+              new Promise((resolve) => {
+                pendingRequests.push(() => resolve());
+              })
+            ).flatMap(() => forward(operation));
+          }
+
+          isRefreshing = true;
+
+          return fromPromise(
+            refreshAccessToken(refreshToken)
+              .then((newToken) => {
+                const oldHeaders = operation.getContext().headers;
+                operation.setContext({
+                  headers: {
+                    ...oldHeaders,
+                    authorization: `Bearer ${newToken}`,
+                  },
+                });
+
+                resolvePendingRequests();
+                return newToken;
+              })
+              .catch((error) => {
+                pendingRequests = [];
+                console.error('❌ Token refresh failed, user must re-login:', error.message);
+                return null;
+              })
+              .finally(() => {
+                isRefreshing = false;
+              })
+          )
+            .filter((value) => Boolean(value))
+            .flatMap(() => forward(operation));
+        });
     }
   }
 });

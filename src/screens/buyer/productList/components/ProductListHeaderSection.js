@@ -19,6 +19,7 @@ import theme from '../../../../theme/theme';
  *   onSearchChange: (value: string) => void,
  *   onSearchFocus: () => void,
  *   onSuggestionPress: (value: string) => void,
+ *   isGuest: boolean,
  *   searchInput: string,
  *   selectedSortLabel: string,
  *   showSuggestions: boolean,
@@ -27,6 +28,7 @@ import theme from '../../../../theme/theme';
  * @return {React.JSX.Element} Header section UI.
  */
 export default function ProductListHeaderSection({
+  isGuest,
   appliedFilterCount,
   isSuggestionsLoading,
   onClearAllFilters,
@@ -58,10 +60,14 @@ export default function ProductListHeaderSection({
         <TouchableOpacity
           onPress={onLogout}
           style={styles.logoutButton}
-          accessibilityLabel="Logout"
-          accessibilityHint="Logout from the application"
+          accessibilityLabel={isGuest ? 'Login' : 'Logout'}
+          accessibilityHint={isGuest ? 'Go to login screen' : 'Logout from the application'}
         >
-          <MaterialIcons name="logout" size={22} color={theme.colors.primary} />
+          <MaterialIcons
+            name={isGuest ? 'login' : 'logout'}
+            size={22}
+            color={theme.colors.primary}
+          />
         </TouchableOpacity>
       </View>
 
