@@ -331,7 +331,7 @@ export function RegisterScreen({ navigation, onAuthSuccess }) {
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="John Doe"
+                    placeholder="Name"
                     placeholderTextColor={PLACEHOLDER_COLOR}
                     value={name}
                     onChangeText={handleNameChange}
@@ -361,7 +361,7 @@ export function RegisterScreen({ navigation, onAuthSuccess }) {
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="john@example.com"
+                    placeholder="Email"
                     placeholderTextColor={PLACEHOLDER_COLOR}
                     value={email}
                     onChangeText={handleEmailChange}

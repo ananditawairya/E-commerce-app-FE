@@ -228,7 +228,7 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
       }
 
       console.log('Add to cart - Auth check passed:', {
-        hasToken: !!token,
+        hasToken: !!rawToken,
         hasUserId: !!userId
       });
     } catch (error) {
