@@ -17,6 +17,17 @@ const SUPPRESSED_GRAPHQL_MESSAGES = new Set([
   'Invalid credentials',
   'Seller access required',
 ]);
+const STOCK_VALIDATION_OPERATION_NAMES = new Set([
+  'AddToCart',
+  'UpdateCartItem',
+  'Checkout',
+]);
+const STOCK_VALIDATION_SUPPRESSED_PATTERNS = [
+  /insufficient stock/i,
+  /cannot add \d+ units/i,
+  /you already have \d+ in cart/i,
+  /you can add up to \d+ more units?/i,
+];
 const NO_REFRESH_OPERATION_NAMES = new Set([
   'Login',
   'Register',
@@ -42,6 +53,12 @@ const graphqlWarningLogTimestamps = new Map();
 const shouldLogGraphQLError = ({ message, operationName, path }) => {
   const normalizedMessage = typeof message === 'string' ? message.trim() : '';
   if (SUPPRESSED_GRAPHQL_MESSAGES.has(normalizedMessage)) {
+    return false;
+  }
+  if (
+    STOCK_VALIDATION_OPERATION_NAMES.has(operationName || '')
+    && STOCK_VALIDATION_SUPPRESSED_PATTERNS.some((pattern) => pattern.test(normalizedMessage))
+  ) {
     return false;
   }
 

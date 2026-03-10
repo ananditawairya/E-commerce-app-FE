@@ -23,6 +23,25 @@ const ROUTES = {
 };
 
 /**
+ * Parses available stock from backend error messages.
+ * @param {string} message Error message.
+ * @return {number|null} Parsed stock value.
+ */
+const extractAvailableStock = (message) => {
+  if (typeof message !== 'string') {
+    return null;
+  }
+
+  const match = message.match(/Available:\s*(\d+)/i);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+/**
  * Buyer cart screen.
  * @param {{navigation: object}} props Screen props.
  * @return {React.JSX.Element} Cart UI with checkout actions.
@@ -54,20 +73,64 @@ const CartScreen = ({ navigation }) => {
 
   /**
    * Handles update quantity.
-   * @param {string} productId Product identifier.
-   * @param {string} variantId Variant identifier.
-   * @param {number} newQuantity New quantity value.
-   * @return {void} No return value.
+   * @param {{
+   *   productId: string,
+   *   variantId: string|null|undefined,
+   *   newQuantity: number,
+   *   currentQuantity: number,
+   *   availableStock: number|null,
+   *   productName: string,
+   * }} params Quantity update payload.
+   * @return {Promise<void>} Completion promise.
    */
-  const handleUpdateQuantity = (productId, variantId, newQuantity) => {
+  const handleUpdateQuantity = async ({
+    productId,
+    variantId,
+    newQuantity,
+    currentQuantity,
+    availableStock,
+    productName,
+  }) => {
+    if (newQuantity < 0) {
+      return;
+    }
+
+    if (
+      Number.isFinite(availableStock)
+      && newQuantity > currentQuantity
+      && newQuantity > availableStock
+    ) {
+      return;
+    }
+
     if (newQuantity === 0) {
       handleRemoveItem(productId, variantId);
       return;
     }
 
-    updateCartItem({
-      variables: { productId, variantId, quantity: newQuantity },
-    });
+    try {
+      await updateCartItem({
+        variables: { productId, variantId, quantity: newQuantity },
+      });
+    } catch (error) {
+      const message = error?.message || 'Failed to update cart item';
+      if (/insufficient stock/i.test(message)) {
+        const parsedAvailable = extractAvailableStock(message);
+        const isOutOfStock = parsedAvailable === 0;
+        await refetch();
+        Alert.alert(
+          'Stock Updated',
+          isOutOfStock
+            ? `${productName || 'This item'} is out of stock. Please remove it from your cart.`
+            : `${productName || 'This item'} now has limited stock.`
+              + ` Available: ${Number.isFinite(parsedAvailable) ? parsedAvailable : 'latest quantity'}.`
+              + ' Please reduce quantity.'
+        );
+        return;
+      }
+
+      Alert.alert('Error', message);
+    }
   };
 
   /**
@@ -124,44 +187,82 @@ const CartScreen = ({ navigation }) => {
    * @param {object} params Callback parameters.
    * @return {React.JSX.Element} Rendered element.
    */
-  const renderCartItem = ({ item }) => (
-    <View style={styles.cartItem}>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.productName}</Text>
-        {item.variantId && (
-          <Text style={styles.itemVariant}>Variant: {item.variantName}</Text>
-        )}
-        <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
-      </View>
+  const renderCartItem = ({ item }) => {
+    const availableStock = Number.isFinite(item.availableStock)
+      ? Math.max(0, item.availableStock)
+      : null;
+    const canIncrease = availableStock === null || item.quantity < availableStock;
+    const quantityExceedsStock = availableStock !== null && item.quantity > availableStock;
+    const stockWarningText = availableStock === 0
+      ? 'Out of stock. Please remove this item from cart.'
+      : `Stock changed. Reduce quantity to ${availableStock} or less.`;
 
-      <View style={styles.quantityControls}>
+    return (
+      <View style={styles.cartItem}>
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName}>{item.productName}</Text>
+          {item.variantId && (
+            <Text style={styles.itemVariant}>Variant: {item.variantName}</Text>
+          )}
+          <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+          {quantityExceedsStock && (
+            <Text style={styles.stockWarning}>
+              {stockWarningText}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.quantityControls}>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => {
+              handleUpdateQuantity({
+                productId: item.productId,
+                variantId: item.variantId,
+                newQuantity: item.quantity - 1,
+                currentQuantity: item.quantity,
+                availableStock,
+                productName: item.productName,
+              });
+            }}
+          >
+            <MaterialIcons name="remove" size={18} color="#2563EB" />
+          </TouchableOpacity>
+          <Text style={styles.quantityText}>{item.quantity}</Text>
+          <TouchableOpacity
+            style={[
+              styles.quantityButton,
+              !canIncrease && styles.quantityButtonDisabled,
+            ]}
+            onPress={() => {
+              handleUpdateQuantity({
+                productId: item.productId,
+                variantId: item.variantId,
+                newQuantity: item.quantity + 1,
+                currentQuantity: item.quantity,
+                availableStock,
+                productName: item.productName,
+              });
+            }}
+            disabled={!canIncrease}
+          >
+            <MaterialIcons
+              name="add"
+              size={18}
+              color={!canIncrease ? '#94A3B8' : '#2563EB'}
+            />
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
-          style={styles.quantityButton}
-          onPress={() =>
-            handleUpdateQuantity(item.productId, item.variantId, item.quantity - 1)
-          }
+          onPress={() => handleRemoveItem(item.productId, item.variantId)}
+          style={styles.removeButton}
         >
-          <MaterialIcons name="remove" size={18} color="#2563EB" />
-        </TouchableOpacity>
-        <Text style={styles.quantityText}>{item.quantity}</Text>
-        <TouchableOpacity
-          style={styles.quantityButton}
-          onPress={() =>
-            handleUpdateQuantity(item.productId, item.variantId, item.quantity + 1)
-          }
-        >
-          <MaterialIcons name="add" size={18} color="#2563EB" />
+          <MaterialIcons name="delete" size={24} color="#ff3b30" />
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        onPress={() => handleRemoveItem(item.productId, item.variantId)}
-        style={styles.removeButton}
-      >
-        <MaterialIcons name="delete" size={24} color="#ff3b30" />
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -311,6 +412,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: theme.colors.primary,
   },
+  stockWarning: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '500',
+  },
   quantityControls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -325,6 +432,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.primarySoft,
+  },
+  quantityButtonDisabled: {
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F1F5F9',
   },
   quantityText: {
     fontSize: 14,

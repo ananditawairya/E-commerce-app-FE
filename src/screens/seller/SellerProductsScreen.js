@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useQuery, useMutation } from '@apollo/client';
+import { NetworkStatus, useQuery, useMutation } from '@apollo/client';
 import { GET_SELLER_PRODUCTS } from '../../graphql/queries';
 import { DELETE_PRODUCT } from '../../graphql/mutations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -53,13 +53,27 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
     };
   }, []);
 
-  const { data, loading, error, refetch } = useQuery(GET_SELLER_PRODUCTS, {
-    fetchPolicy: 'network-only',
+  const {
+    data,
+    loading,
+    error,
+    refetch,
+    networkStatus,
+  } = useQuery(GET_SELLER_PRODUCTS, {
+    fetchPolicy: 'cache-and-network',
+    nextFetchPolicy: 'cache-first',
     errorPolicy: 'none',
     notifyOnNetworkStatusChange: true,
-    pollInterval: 5000,
     skip: hasSellerAccess !== true,
   });
+
+  const sellerProducts = useMemo(
+    () => (Array.isArray(data?.sellerProducts) ? data.sellerProducts : []),
+    [data?.sellerProducts]
+  );
+  const isInitialLoading = hasSellerAccess === null || (loading && sellerProducts.length === 0);
+  const isRefreshing = hasSellerAccess === true
+    && networkStatus === NetworkStatus.refetch;
 
   const [deleteProduct] = useMutation(DELETE_PRODUCT, {
     refetchQueries: [{ query: GET_SELLER_PRODUCTS }],
@@ -177,7 +191,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
         </TouchableOpacity>
       </View>
 
-      {hasSellerAccess === null || loading ? (
+      {isInitialLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
@@ -203,7 +217,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
         </View>
       ) : (
         <FlatList
-          data={data?.sellerProducts || []}
+          data={sellerProducts}
           renderItem={renderProduct}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
@@ -211,7 +225,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
             { paddingBottom: tabBarHeight + insets.bottom + 20 },
           ]}
           onRefresh={refetch}
-          refreshing={loading}
+          refreshing={isRefreshing}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MaterialIcons name="inventory" size={60} color="#ccc" />

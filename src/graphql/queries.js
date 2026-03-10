@@ -142,6 +142,7 @@ export const GET_MY_CART = gql`
         variantName
         quantity
         price
+        availableStock
       }
       totalAmount
     }

@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 2,
+    marginBottom: 6,
   },
   bottomRow: {
     marginTop: 8,

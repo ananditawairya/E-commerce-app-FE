@@ -340,7 +340,7 @@ const ChatBot = ({ navigation }) => {
                                 </View>
                                 <View>
                                     <Text style={styles.headerTitle}>Shopping Assistant</Text>
-                                    <Text style={styles.headerSubtitle}>Powered by AI</Text>
+                                    <Text style={styles.headerSubtitle}>Powered by Gemini</Text>
                                 </View>
                             </View>
                             <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.closeButton}>

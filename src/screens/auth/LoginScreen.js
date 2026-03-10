@@ -20,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LOGIN } from '../../graphql/mutations';
-import { validateEmail, validatePassword } from '../../utils/validators';
+import { validateEmail, validateRequired } from '../../utils/validators';
 
 const AUTH_ROUTES = {
   REGISTER: 'Register',
@@ -113,7 +113,7 @@ export function LoginScreen({ navigation, onAuthSuccess, onGuestLogin }) {
    * @return {{isValid: boolean, error: string}} Validation result.
    */
   const validatePasswordField = (value) => {
-    const validation = validatePassword(value);
+    const validation = validateRequired(value, 'Password');
     setPasswordError(validation.error);
     return validation;
   };
@@ -199,7 +199,7 @@ export function LoginScreen({ navigation, onAuthSuccess, onGuestLogin }) {
   };
 
   const isFormValid = validateEmail(email).isValid &&
-    validatePassword(password).isValid;
+    validateRequired(password, 'Password').isValid;
   const emailHasError = touched.email && Boolean(emailError);
   const passwordHasError = touched.password && Boolean(passwordError);
   const passwordVisibilityIconName = showPassword

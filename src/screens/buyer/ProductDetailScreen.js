@@ -31,6 +31,62 @@ const formatCurrency = (value) => {
 };
 
 /**
+ * Resolves the best description for a selected variant.
+ * Falls back to product description when variant description is empty.
+ * @param {object|null|undefined} variant Variant object.
+ * @param {object} product Product object.
+ * @return {string} Display description.
+ */
+const getVariantDisplayDescription = (variant, product) => {
+  if (!variant || typeof variant !== 'object') {
+    return typeof product?.description === 'string' ? product.description : '';
+  }
+
+  const candidate = [
+    variant.effectiveDescription,
+    variant.description,
+    product?.description,
+  ].find((value) => typeof value === 'string' && value.trim().length > 0);
+
+  return candidate || '';
+};
+
+/**
+ * Normalizes backend stock-validation messages for buyer-friendly alerts.
+ * @param {string} message Raw backend message.
+ * @return {string} Short display message.
+ */
+const toStockValidationMessage = (message) => {
+  if (typeof message !== 'string' || !message.trim()) {
+    return 'Stock is limited for this item. Please adjust quantity.';
+  }
+
+  const remainingMatch = message.match(/add up to\s*(\d+)\s*more/i);
+  if (remainingMatch?.[1]) {
+    const remaining = Number.parseInt(remainingMatch[1], 10);
+    if (remaining === 0) {
+      return 'This variant is already at maximum quantity in your cart.';
+    }
+
+    const unitLabel = remaining === 1 ? 'unit' : 'units';
+    return `You can add only ${remaining} more ${unitLabel} for this variant.`;
+  }
+
+  const availableMatch = message.match(/available:\s*(\d+)/i);
+  if (availableMatch?.[1]) {
+    const available = Number.parseInt(availableMatch[1], 10);
+    if (available === 0) {
+      return 'This variant is currently out of stock.';
+    }
+
+    const unitLabel = available === 1 ? 'unit' : 'units';
+    return `Only ${available} ${unitLabel} available right now.`;
+  }
+
+  return 'Stock is limited for this item. Please adjust quantity.';
+};
+
+/**
  * Product detail screen.
  * @param {{route: {params: {product: object}}, navigation: object}} props Screen props.
  * @return {React.JSX.Element} Product detail UI.
@@ -44,6 +100,7 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [userId, setUserId] = useState(null);
+  const shouldFetchCart = !isGuest && Boolean(userId);
 
   /**
    * Navigates back when possible, otherwise routes to buyer products tab.
@@ -67,6 +124,10 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
   const { data: similarData, loading: similarLoading } = useQuery(GET_SIMILAR_PRODUCTS, {
     variables: { productId: product.id, limit: 10 },
     skip: isGuest,
+  });
+  const { data: cartData } = useQuery(GET_MY_CART, {
+    skip: !shouldFetchCart,
+    fetchPolicy: 'cache-and-network',
   });
 
   const [trackEvent] = useMutation(TRACK_EVENT);
@@ -129,9 +190,13 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
       navigateBackOrHome();
     },
     onError: async (error) => {
-      console.error('Add to cart error:', error);
+      const message = error?.message || 'Failed to add product to cart';
+      const isStockValidationError = /insufficient stock|cannot add \d+ units|you already have \d+ in cart|you can add up to \d+ more units?/i.test(message);
+      if (!isStockValidationError) {
+        console.error('Add to cart error:', error);
+      }
 
-      if (error.message.includes('Authentication failed') || error.message.includes('Unauthorized')) {
+      if (message.includes('Authentication failed') || message.includes('Unauthorized')) {
         try {
           const token = await AsyncStorage.getItem('accessToken');
           const userId = await AsyncStorage.getItem('userId');
@@ -181,8 +246,10 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
             },
           ]
         );
+      } else if (isStockValidationError) {
+        Alert.alert('Stock Limit Reached', toStockValidationMessage(message));
       } else {
-        Alert.alert('Error', error.message || 'Failed to add product to cart');
+        Alert.alert('Error', message);
       }
     },
   });
@@ -196,24 +263,72 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
     return product.basePrice + selectedVariant.priceModifier;
   };
 
+  const selectedDescription = getVariantDisplayDescription(selectedVariant, product);
+  const selectedVariantStock = Number.isFinite(selectedVariant?.stock)
+    ? Math.max(0, selectedVariant.stock)
+    : null;
+  const existingCartQuantity = React.useMemo(() => {
+    const items = cartData?.myCart?.items;
+    if (!Array.isArray(items) || !product?.id) {
+      return 0;
+    }
+
+    const targetProductId = String(product.id);
+    const targetVariantId = selectedVariant?.id ? String(selectedVariant.id) : null;
+
+    return items.reduce((total, item) => {
+      if (!item || String(item.productId) !== targetProductId) {
+        return total;
+      }
+
+      const itemVariantId = item.variantId ? String(item.variantId) : null;
+      if (itemVariantId !== targetVariantId) {
+        return total;
+      }
+
+      const itemQuantity = Number.parseInt(item.quantity, 10);
+      return total + (Number.isFinite(itemQuantity) ? Math.max(0, itemQuantity) : 0);
+    }, 0);
+  }, [cartData?.myCart?.items, product?.id, selectedVariant?.id]);
+  const remainingAddableStock = Number.isFinite(selectedVariantStock)
+    ? Math.max(0, selectedVariantStock - existingCartQuantity)
+    : null;
+  const isMaxedInCart = Number.isFinite(remainingAddableStock)
+    && remainingAddableStock === 0
+    && existingCartQuantity > 0;
+  const canIncreaseQuantity = !Number.isFinite(remainingAddableStock)
+    || quantity < remainingAddableStock;
+
+  React.useEffect(() => {
+    if (
+      Number.isFinite(remainingAddableStock)
+      && remainingAddableStock > 0
+      && quantity > remainingAddableStock
+    ) {
+      setQuantity(remainingAddableStock);
+    }
+  }, [remainingAddableStock, quantity]);
+
   /**
    * Checks whether out of stock.
    * @return {boolean} Whether the condition is met.
    */
   const isOutOfStock = () => {
-    if (selectedVariant) {
-      return selectedVariant.stock === 0;
+    if (selectedVariant && Number.isFinite(selectedVariantStock)) {
+      return selectedVariantStock === 0;
     }
     return false;
   };
 
   const handleAddToCart = async () => {
+    let resolvedUserId = userId;
+
     try {
       const rawToken = await AsyncStorage.getItem('accessToken');
-      const userId = await AsyncStorage.getItem('userId');
+      const storedUserId = await AsyncStorage.getItem('userId');
       const hasToken = typeof rawToken === 'string' && rawToken.trim().length > 0;
 
-      if (!hasToken || !userId || isGuest) {
+      if (!hasToken || !storedUserId || isGuest) {
         Alert.alert(
           'Please Log In',
           'You need to be logged in to add items to cart.',
@@ -227,10 +342,10 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
         return;
       }
 
-      console.log('Add to cart - Auth check passed:', {
-        hasToken: !!rawToken,
-        hasUserId: !!userId
-      });
+      resolvedUserId = storedUserId;
+      if (storedUserId !== userId) {
+        setUserId(storedUserId);
+      }
     } catch (error) {
       console.error('Auth verification error:', error);
       Alert.alert('Error', 'Failed to verify authentication');
@@ -242,8 +357,23 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
       return;
     }
 
-    if (selectedVariant && selectedVariant.stock < quantity) {
-      Alert.alert('Error', 'Not enough stock available');
+    if (Number.isFinite(remainingAddableStock) && remainingAddableStock <= 0) {
+      Alert.alert(
+        'Stock Limit Reached',
+        'All available stock for this variant is already in your cart.'
+      );
+      return;
+    }
+
+    if (Number.isFinite(remainingAddableStock) && quantity > remainingAddableStock) {
+      const unitLabel = remainingAddableStock === 1 ? 'unit' : 'units';
+      Alert.alert(
+        'Stock Limit Reached',
+        `You can add up to ${remainingAddableStock} more ${unitLabel} for this variant.`
+      );
+      if (remainingAddableStock > 0) {
+        setQuantity(remainingAddableStock);
+      }
       return;
     }
 
@@ -258,14 +388,15 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
       price: parseFloat(price.toFixed(2)),
     };
 
-    console.log('Adding to cart with variables:', variables);
+    const addResult = await addToCart({ variables });
+    if (addResult?.errors?.length) {
+      return;
+    }
 
-    addToCart({ variables });
-
-    if (userId) {
+    if (resolvedUserId) {
       trackEvent({
         variables: {
-          userId,
+          userId: resolvedUserId,
           productId: product.id,
           eventType: 'cart_add',
           category: product.category,
@@ -348,7 +479,7 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
           </Text>
 
           <Text style={styles.sectionTitle}>Description</Text>
-          <Text style={styles.description}>{product.description}</Text>
+          <Text style={styles.description}>{selectedDescription}</Text>
 
           {product.variants && product.variants.length > 0 && (
             <>
@@ -374,6 +505,17 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
                     ]}>
                       {variant.name}
                     </Text>
+                    {!!getVariantDisplayDescription(variant, product) && (
+                      <Text
+                        style={[
+                          styles.variantDescription,
+                          variant.stock === 0 && styles.variantDescriptionOutOfStock,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {getVariantDisplayDescription(variant, product)}
+                      </Text>
+                    )}
                     <Text style={[
                       styles.variantStock,
                       variant.stock === 0 && styles.outOfStockText
@@ -411,12 +553,39 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
                 </TouchableOpacity>
                 <Text style={styles.quantityText}>{quantity}</Text>
                 <TouchableOpacity
-                  style={styles.quantityButton}
-                  onPress={() => setQuantity(quantity + 1)}
+                  style={[
+                    styles.quantityButton,
+                    !canIncreaseQuantity && styles.quantityButtonDisabled,
+                  ]}
+                  onPress={() => {
+                    if (!canIncreaseQuantity) {
+                      return;
+                    }
+
+                    const nextQuantity = quantity + 1;
+                    if (Number.isFinite(remainingAddableStock)) {
+                      setQuantity(Math.min(remainingAddableStock, nextQuantity));
+                      return;
+                    }
+
+                    setQuantity(nextQuantity);
+                  }}
+                  disabled={!canIncreaseQuantity}
                 >
-                  <MaterialIcons name="add" size={20} color="#2563EB" />
+                  <MaterialIcons
+                    name="add"
+                    size={20}
+                    color={!canIncreaseQuantity ? '#94A3B8' : '#2563EB'}
+                  />
                 </TouchableOpacity>
               </View>
+              {Number.isFinite(remainingAddableStock) && existingCartQuantity > 0 && (
+                <Text style={styles.stockHint}>
+                  {isMaxedInCart
+                    ? 'All available stock for this variant is already in your cart.'
+                    : `In cart: ${existingCartQuantity}. You can add ${remainingAddableStock} more.`}
+                </Text>
+              )}
             </View>
           )}
 
@@ -427,15 +596,18 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
             </View>
           ) : (
             <TouchableOpacity
-              style={styles.addToCartButton}
+              style={[
+                styles.addToCartButton,
+                (loading || isMaxedInCart) && styles.addToCartButtonDisabled,
+              ]}
               onPress={handleAddToCart}
-              disabled={loading}
+              disabled={loading || isMaxedInCart}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.addToCartText}>
-                  {isGuest ? 'Sign In to Add to Cart' : 'Add to Cart'}
+                  {isGuest ? 'Sign In to Add to Cart' : (isMaxedInCart ? 'Max Quantity In Cart' : 'Add to Cart')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -619,6 +791,15 @@ const styles = StyleSheet.create({
     color: '#999',
     textDecorationLine: 'line-through',
   },
+  variantDescription: {
+    marginBottom: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#6B7280',
+  },
+  variantDescriptionOutOfStock: {
+    color: '#9CA3AF',
+  },
   variantStock: {
     fontSize: 12,
     color: '#6B7280',
@@ -653,12 +834,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#EFF6FF',
   },
+  quantityButtonDisabled: {
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F1F5F9',
+  },
   quantityText: {
     fontSize: 18,
     fontWeight: '600',
     color: '#111827',
     minWidth: 30,
     textAlign: 'center',
+  },
+  stockHint: {
+    marginTop: 10,
+    fontSize: 13,
+    color: '#475569',
   },
   outOfStockContainer: {
     marginTop: 20,
@@ -690,6 +880,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 30,
     marginBottom: 20,
+  },
+  addToCartButtonDisabled: {
+    backgroundColor: '#94A3B8',
   },
   addToCartText: {
     color: '#fff',

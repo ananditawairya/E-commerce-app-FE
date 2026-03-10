@@ -50,6 +50,7 @@ export const ADD_TO_CART = gql`
         variantName
         quantity
         price
+        availableStock
       }
       totalAmount
     }
@@ -65,9 +66,12 @@ export const UPDATE_CART_ITEM = gql`
       items {
         id
         productId
+        productName
         variantId
+        variantName
         quantity
         price
+        availableStock
       }
       totalAmount
     }
@@ -83,9 +87,12 @@ export const REMOVE_FROM_CART = gql`
       items {
         id
         productId
+        productName
         variantId
+        variantName
         quantity
         price
+        availableStock
       }
       totalAmount
     }
