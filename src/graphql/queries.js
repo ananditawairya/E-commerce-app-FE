@@ -1,11 +1,33 @@
-// mobile/src/graphql/queries.js
-
 import { gql } from '@apollo/client';
 
-// CHANGE: Enhanced GET_PRODUCTS to include formattedDescription and effectivePrice for variants
+/**
+ * GraphQL query definitions used by the mobile frontend.
+ */
+
+/** Fetches product listings with filters and pagination. */
 export const GET_PRODUCTS = gql`
-  query GetProducts($search: String, $category: String, $limit: Int, $offset: Int) {
-    products(search: $search, category: $category, limit: $limit, offset: $offset) {
+  query GetProducts(
+    $search: String
+    $category: String
+    $categories: [String!]
+    $minPrice: Float
+    $maxPrice: Float
+    $inStockOnly: Boolean
+    $sortBy: ProductSortBy
+    $limit: Int
+    $offset: Int
+  ) {
+    products(
+      search: $search
+      category: $category
+      categories: $categories
+      minPrice: $minPrice
+      maxPrice: $maxPrice
+      inStockOnly: $inStockOnly
+      sortBy: $sortBy
+      limit: $limit
+      offset: $offset
+    ) {
       id
       name
       description
@@ -32,7 +54,7 @@ export const GET_PRODUCTS = gql`
   }
 `;
 
-// CHANGE: Enhanced GET_PRODUCT to include all variant fields and formatted description
+/** Fetches one product by identifier. */
 export const GET_PRODUCT = gql`
   query GetProduct($id: ID!) {
     product(id: $id) {
@@ -62,12 +84,51 @@ export const GET_PRODUCT = gql`
   }
 `;
 
+/** Fetches all available product categories. */
 export const GET_CATEGORIES = gql`
   query GetCategories {
     categories
   }
 `;
 
+/** Fetches type-ahead search suggestions. */
+export const GET_SEARCH_SUGGESTIONS = gql`
+  query GetSearchSuggestions(
+    $query: String!
+    $categories: [String!]
+    $limit: Int
+  ) {
+    searchSuggestions(query: $query, categories: $categories, limit: $limit) {
+      text
+      category
+      score
+      source
+    }
+  }
+`;
+
+/** Fetches the currently authenticated user profile. */
+export const ME = gql`
+  query Me($token: String!) {
+    me(token: $token) {
+      id
+      email
+      name
+      role
+      addresses {
+        id
+        street
+        city
+        state
+        zipCode
+        country
+        isDefault
+      }
+    }
+  }
+`;
+
+/** Fetches the authenticated buyer cart. */
 export const GET_MY_CART = gql`
   query GetMyCart {
     myCart {
@@ -76,15 +137,19 @@ export const GET_MY_CART = gql`
       items {
         id
         productId
+        productName
         variantId
+        variantName
         quantity
         price
+        availableStock
       }
       totalAmount
     }
   }
 `;
 
+/** Fetches order history for the authenticated buyer. */
 export const GET_MY_ORDERS = gql`
   query GetMyOrders {
     myOrders {
@@ -116,7 +181,7 @@ export const GET_MY_ORDERS = gql`
   }
 `;
 
-// CHANGE: Enhanced GET_SELLER_PRODUCTS to include all product and variant fields
+/** Fetches products owned by the authenticated seller. */
 export const GET_SELLER_PRODUCTS = gql`
   query GetSellerProducts {
     sellerProducts {
@@ -147,6 +212,7 @@ export const GET_SELLER_PRODUCTS = gql`
   }
 `;
 
+/** Fetches orders for the authenticated seller. */
 export const GET_SELLER_ORDERS = gql`
   query GetSellerOrders {
     sellerOrders {
@@ -178,6 +244,25 @@ export const GET_SELLER_ORDERS = gql`
   }
 `;
 
+export const GET_SELLER_ANALYTICS = gql`
+  query GetSellerAnalytics($days: Int) {
+    sellerAnalytics(days: $days) {
+      totalRevenue
+      totalOrders
+      averageOrderValue
+      ordersByStatus {
+        status
+        count
+      }
+      trend {
+        date
+        revenue
+        orders
+      }
+    }
+  }
+`;
+
 export const GET_ORDER = gql`
   query GetOrder($id: ID!) {
     order(id: $id) {
@@ -205,6 +290,50 @@ export const GET_ORDER = gql`
       paymentMethod
       createdAt
       updatedAt
+    }
+  }
+`;
+
+export const GET_RECOMMENDATIONS = gql`
+  query GetRecommendations($userId: ID!, $limit: Int) {
+    getRecommendations(userId: $userId, limit: $limit) {
+      productId
+      score
+      reason
+      category
+    }
+  }
+`;
+
+export const GET_SIMILAR_PRODUCTS = gql`
+  query GetSimilarProducts($productId: ID!, $limit: Int) {
+    getSimilarProducts(productId: $productId, limit: $limit) {
+      productId
+      score
+      reason
+      category
+    }
+  }
+`;
+
+export const GET_TRENDING_PRODUCTS = gql`
+  query GetTrendingProducts($category: String, $limit: Int) {
+    getTrendingProducts(category: $category, limit: $limit) {
+      productId
+      score
+      reason
+      category
+    }
+  }
+`;
+
+export const GET_RECENTLY_VIEWED = gql`
+  query GetRecentlyViewed($userId: ID!, $limit: Int) {
+    getRecentlyViewed(userId: $userId, limit: $limit) {
+      productId
+      score
+      reason
+      category
     }
   }
 `;

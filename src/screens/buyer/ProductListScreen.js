@@ -1,283 +1,719 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
   ActivityIndicator,
   Alert,
+  FlatList,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useQuery } from '@apollo/client';
-import { GET_PRODUCTS, GET_CATEGORIES } from '../../graphql/queries';
+import { NetworkStatus, useQuery } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// CHANGE: Accept onLogout prop from parent component
-const ProductListScreen = ({ navigation, onLogout }) => {
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+import ChatBot from '../../components/ChatBot';
+import ProductCard from '../../components/ProductCard';
+import {
+  GET_CATEGORIES,
+  GET_PRODUCTS,
+  GET_SEARCH_SUGGESTIONS,
+  GET_RECOMMENDATIONS,
+  GET_TRENDING_PRODUCTS,
+} from '../../graphql/queries';
+import {
+  ALL_CATEGORIES_LABEL,
+  DEFAULT_PRICE_KEY,
+  DEFAULT_SORT,
+  PAGE_SIZE,
+  PRICE_OPTIONS,
+  PRODUCT_DETAIL_ROUTE,
+  SORT_OPTIONS,
+} from './productList/constants';
+import ProductListDiscoveryHeader from './productList/components/ProductListDiscoveryHeader';
+import ProductListFilterModal from './productList/components/ProductListFilterModal';
+import ProductListHeaderSection from './productList/components/ProductListHeaderSection';
+import ProductListSkeletonGrid from './productList/components/ProductListSkeletonGrid';
+import ProductListSortModal from './productList/components/ProductListSortModal';
+import styles from './productList/styles';
 
-  const { data, loading, refetch } = useQuery(GET_PRODUCTS, {
-    variables: { search, category: selectedCategory || null, limit: 20 },
+/**
+ * Maps recommendation payloads to product entities available in the current list.
+ * @param {Array<object>} recommendations Recommendation payloads.
+ * @param {Array<object>} products Product list from catalog query.
+ * @return {Array<object>} Enriched product list.
+ */
+function enrichProducts(recommendations, products) {
+  if (!recommendations?.length || !products.length) {
+    return [];
+  }
+
+  return recommendations
+    .map((recommendation) => {
+      const product = products.find(
+        (item) => item.id === recommendation.productId
+      );
+      return product ? { ...product, ...recommendation } : null;
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Extracts best-effort HTTP status from Apollo/network error.
+ * @param {unknown} error Apollo error object.
+ * @return {number|null} HTTP status code if available.
+ */
+function getStatusCode(error) {
+  const directStatus = error?.statusCode;
+  if (Number.isFinite(directStatus)) {
+    return directStatus;
+  }
+
+  const networkStatus = error?.networkError?.statusCode;
+  if (Number.isFinite(networkStatus)) {
+    return networkStatus;
+  }
+
+  const responseStatus = error?.networkError?.response?.status;
+  if (Number.isFinite(responseStatus)) {
+    return responseStatus;
+  }
+
+  return null;
+}
+
+/**
+ * Product catalog screen with search, filters, and recommendations.
+ * @param {{
+ *   navigation: object,
+ *   onLogout?: () => Promise<void>,
+ * }} props Screen props.
+ * @return {React.JSX.Element} Product list screen UI.
+ */
+const ProductListScreen = ({ navigation, onLogout, isGuest, onSignIn }) => {
+  const PAGINATION_RATE_LIMIT_COOLDOWN_MS = 20_000;
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const loadMoreInFlightRef = useRef(false);
+  const endReachedInMomentumRef = useRef(false);
+
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedSort, setSelectedSort] = useState(DEFAULT_SORT);
+  const [selectedPriceKey, setSelectedPriceKey] = useState(DEFAULT_PRICE_KEY);
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextLoadMoreAt, setNextLoadMoreAt] = useState(0);
+  const [paginationNotice, setPaginationNotice] = useState('');
+  const [isPaginating, setPaginating] = useState(false);
+  const [isSearchFocused, setSearchFocused] = useState(false);
+
+  const [isSortModalVisible, setSortModalVisible] = useState(false);
+  const [isFilterModalVisible, setFilterModalVisible] = useState(false);
+  const [draftCategories, setDraftCategories] = useState([]);
+  const [draftPriceKey, setDraftPriceKey] = useState(DEFAULT_PRICE_KEY);
+  const [draftInStockOnly, setDraftInStockOnly] = useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  React.useEffect(() => {
+    const getUserId = async () => {
+      if (isGuest) {
+        setUserId(null);
+        return;
+      }
+      const storedUserId = await AsyncStorage.getItem('userId');
+      setUserId(storedUserId);
+    };
+
+    getUserId();
+  }, [isGuest]);
+
+  React.useEffect(() => {
+    setHasMore(true);
+    setNextLoadMoreAt(0);
+    setPaginationNotice('');
+  }, [
+    debouncedSearch,
+    selectedCategories,
+    selectedSort,
+    selectedPriceKey,
+    inStockOnly,
+  ]);
+
+  React.useEffect(() => {
+    if (!debouncedSearch && selectedSort === 'RELEVANCE') {
+      setSelectedSort(DEFAULT_SORT);
+    }
+  }, [debouncedSearch, selectedSort]);
+
+  const selectedPriceFilter = useMemo(
+    () =>
+      PRICE_OPTIONS.find((option) => option.key === selectedPriceKey) ||
+      PRICE_OPTIONS[0],
+    [selectedPriceKey]
+  );
+
+  const sortForQuery =
+    selectedSort === 'RELEVANCE' && !debouncedSearch
+      ? DEFAULT_SORT
+      : selectedSort;
+  const trimmedSearchInput = searchInput.trim();
+  const shouldFetchSuggestions =
+    isSearchFocused && trimmedSearchInput.length >= 2;
+
+  const productQueryVariables = useMemo(
+    () => ({
+      search: debouncedSearch || null,
+      category: selectedCategories.length === 1 ? selectedCategories[0] : null,
+      categories: selectedCategories.length > 0 ? selectedCategories : null,
+      minPrice:
+        typeof selectedPriceFilter.min === 'number'
+          ? selectedPriceFilter.min
+          : null,
+      maxPrice:
+        typeof selectedPriceFilter.max === 'number'
+          ? selectedPriceFilter.max
+          : null,
+      inStockOnly,
+      sortBy: sortForQuery,
+      limit: PAGE_SIZE,
+      offset: 0,
+    }),
+    [
+      debouncedSearch,
+      selectedCategories,
+      selectedPriceFilter,
+      inStockOnly,
+      sortForQuery,
+    ]
+  );
+
+  const {
+    data,
+    loading,
+    error,
+    fetchMore,
+    refetch,
+    networkStatus,
+  } = useQuery(GET_PRODUCTS, {
+    variables: productQueryVariables,
+    notifyOnNetworkStatusChange: true,
   });
 
-  const { data: categoriesData } = useQuery(GET_CATEGORIES);
+  React.useEffect(() => {
+    const productCount = data?.products?.length;
+    if (typeof productCount === 'number') {
+      setHasMore(productCount >= PAGE_SIZE);
+    }
+  }, [data?.products?.length]);
 
-  // CHANGE: Updated logout handler to use callback instead of navigation reset
+  const { data: recData, loading: recLoading } = useQuery(GET_RECOMMENDATIONS, {
+    variables: { userId, limit: 10 },
+    skip: !userId || isGuest,
+  });
+
+  const { data: trendingData, loading: trendingLoading } = useQuery(
+    GET_TRENDING_PRODUCTS,
+    {
+      variables: { limit: 10 },
+      skip: isGuest,
+    }
+  );
+
+  const { data: categoriesData } = useQuery(GET_CATEGORIES, {
+    skip: isGuest,
+  });
+  const {
+    data: suggestionsData,
+    loading: suggestionsLoading,
+  } = useQuery(GET_SEARCH_SUGGESTIONS, {
+    variables: {
+      query: trimmedSearchInput,
+      categories: selectedCategories.length ? selectedCategories : null,
+      limit: 8,
+    },
+    skip: !shouldFetchSuggestions || isGuest,
+    fetchPolicy: 'no-cache',
+  });
+
+  const products = data?.products || [];
+  const suggestions = suggestionsData?.searchSuggestions || [];
+  const isInitialLoading = loading && products.length === 0;
+  const isFetchingMore = isPaginating;
+  const isRefreshing = networkStatus === NetworkStatus.refetch;
+  const categoryOptions = [
+    ALL_CATEGORIES_LABEL,
+    ...(categoriesData?.categories || []),
+  ];
+
+  const isDiscoveryMode =
+    !debouncedSearch &&
+    selectedCategories.length === 0 &&
+    selectedSort === DEFAULT_SORT &&
+    selectedPriceKey === DEFAULT_PRICE_KEY &&
+    !inStockOnly;
+
+  const selectedSortLabel =
+    SORT_OPTIONS.find((item) => item.value === selectedSort)?.label ||
+    SORT_OPTIONS[0].label;
+
+  const appliedFilterCount =
+    (selectedCategories.length > 0 ? 1 : 0) +
+    (selectedPriceKey !== DEFAULT_PRICE_KEY ? 1 : 0) +
+    (inStockOnly ? 1 : 0) +
+    (selectedSort !== DEFAULT_SORT ? 1 : 0);
+
+  const recommendedProducts = useMemo(
+    () => enrichProducts(recData?.getRecommendations, products),
+    [recData?.getRecommendations, products]
+  );
+  const trendingProducts = useMemo(
+    () => enrichProducts(trendingData?.getTrendingProducts, products),
+    [trendingData?.getTrendingProducts, products]
+  );
+
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            // CHANGE: Use onLogout callback to trigger authentication state change
-            if (onLogout) {
-              await onLogout();
-            } else {
-              // Fallback for cases where callback is not provided
-              console.warn('No logout callback provided');
-              await AsyncStorage.clear();
-            }
-          },
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          if (onLogout) {
+            await onLogout();
+          } else {
+            await AsyncStorage.clear();
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const renderProduct = ({ item }) => (
-    <TouchableOpacity
-      style={styles.productCard}
-      onPress={() => navigation.navigate('ProductDetail', { product: item })}
-    >
-      {item.images && item.images.length > 0 ? (
-        <Image source={{ uri: item.images[0] }} style={styles.productImage} />
-      ) : (
-        <View style={styles.placeholderImage}>
-          <MaterialIcons name="image" size={50} color="#ccc" />
-        </View>
-      )}
-      <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.productCategory}>{item.category}</Text>
-        <Text style={styles.productPrice}>${item.basePrice.toFixed(2)}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  /**
+   * Opens sort modal.
+   * @return {void} No return value.
+   */
+  const handleOpenSortModal = () => {
+    setSortModalVisible(true);
+  };
 
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.categoryChip,
-        selectedCategory === item && styles.categoryChipActive,
-      ]}
-      onPress={() => setSelectedCategory(selectedCategory === item ? '' : item)}
-    >
-      <Text
-        style={[
-          styles.categoryText,
-          selectedCategory === item && styles.categoryTextActive,
-        ]}
-      >
-        {item}
-      </Text>
-    </TouchableOpacity>
-  );
+  /**
+   * Closes sort modal.
+   * @return {void} No return value.
+   */
+  const handleCloseSortModal = () => {
+    setSortModalVisible(false);
+  };
+
+  /**
+   * Opens filter modal.
+   * @return {void} No return value.
+   */
+  const handleOpenFilterModal = () => {
+    setDraftCategories(selectedCategories);
+    setDraftPriceKey(selectedPriceKey);
+    setDraftInStockOnly(inStockOnly);
+    setFilterModalVisible(true);
+  };
+
+  /**
+   * Closes filter modal.
+   * @return {void} No return value.
+   */
+  const handleCloseFilterModal = () => {
+    setFilterModalVisible(false);
+  };
+
+  /**
+   * Clears search.
+   * @return {void} No return value.
+   */
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setDebouncedSearch('');
+    setSearchFocused(false);
+  };
+
+  /**
+   * Clears all filters.
+   * @return {void} No return value.
+   */
+  const clearAllFilters = () => {
+    setSelectedCategories([]);
+    setSelectedSort(DEFAULT_SORT);
+    setSelectedPriceKey(DEFAULT_PRICE_KEY);
+    setInStockOnly(false);
+    setHasMore(true);
+  };
+
+  /**
+   * Resets filters and search.
+   * @return {void} No return value.
+   */
+  const resetFiltersAndSearch = () => {
+    clearAllFilters();
+    setSearchInput('');
+    setDebouncedSearch('');
+  };
+
+  /**
+   * Resets draft filters.
+   * @return {void} No return value.
+   */
+  const resetDraftFilters = () => {
+    setDraftCategories([]);
+    setDraftPriceKey(DEFAULT_PRICE_KEY);
+    setDraftInStockOnly(false);
+  };
+
+  /**
+   * Applies filter modal.
+   * @return {void} No return value.
+   */
+  const applyFilterModal = () => {
+    setSelectedCategories(draftCategories);
+    setSelectedPriceKey(draftPriceKey);
+    setInStockOnly(draftInStockOnly);
+    setFilterModalVisible(false);
+  };
+
+  /**
+   * Toggles one category in draft filters.
+   * @param {string} categoryName Category label.
+   * @return {void} No return value.
+   */
+  const handleToggleDraftCategory = (categoryName) => {
+    if (categoryName === ALL_CATEGORIES_LABEL) {
+      setDraftCategories([]);
+      return;
+    }
+
+    setDraftCategories((previousCategories) => {
+      if (previousCategories.includes(categoryName)) {
+        return previousCategories.filter(
+          (existingCategory) => existingCategory !== categoryName
+        );
+      }
+      return [...previousCategories, categoryName];
+    });
+  };
+
+  /**
+   * Selects sort.
+   * @param {string} nextSort Next sort option.
+   * @return {void} No return value.
+   */
+  const handleSelectSort = (nextSort) => {
+    setSelectedSort(nextSort);
+    setSortModalVisible(false);
+  };
+
+  /**
+   * Updates search input and keeps suggestions active while typing.
+   * @param {string} value Search text.
+   * @return {void} No return value.
+   */
+  const handleSearchChange = useCallback((value) => {
+    setSearchInput(value);
+    setSearchFocused(true);
+  }, []);
+
+  /**
+   * Applies one search suggestion.
+   * @param {string} suggestionText Suggested text.
+   * @return {void} No return value.
+   */
+  const handleSelectSuggestion = useCallback((suggestionText) => {
+    const nextSearch = suggestionText.trim();
+    setSearchInput(nextSearch);
+    setDebouncedSearch(nextSearch);
+    setSearchFocused(false);
+  }, []);
+
+  /**
+   * Handles navigate to product detail.
+   * @param {object} product Product object.
+   * @return {void} No return value.
+   */
+  const handleNavigateToProductDetail = useCallback((product) => {
+    navigation.navigate(PRODUCT_DETAIL_ROUTE, { product });
+  }, [navigation]);
+
+  const loadMore = useCallback(async () => {
+    if (
+      !hasMore
+      || isFetchingMore
+      || isInitialLoading
+      || products.length === 0
+      || loadMoreInFlightRef.current
+    ) {
+      return;
+    }
+
+    if (Date.now() < nextLoadMoreAt) {
+      return;
+    }
+
+    const offset = products.length;
+    loadMoreInFlightRef.current = true;
+    setPaginating(true);
+
+    try {
+      setPaginationNotice('');
+      await fetchMore({
+        variables: {
+          ...productQueryVariables,
+          offset,
+          limit: PAGE_SIZE,
+        },
+        updateQuery: (previousResult, { fetchMoreResult }) => {
+          const nextProducts = fetchMoreResult?.products || [];
+          const previousProducts = previousResult?.products || [];
+
+          if (!nextProducts.length) {
+            setHasMore(false);
+            return previousResult;
+          }
+
+          if (nextProducts.length < PAGE_SIZE) {
+            setHasMore(false);
+          }
+
+          const seen = new Set(
+            previousProducts.map((item) => item.id)
+          );
+          const uniqueNextProducts = nextProducts.filter(
+            (item) => !seen.has(item.id)
+          );
+
+          // Prevent infinite load-more loop when backend returns only duplicates.
+          if (!uniqueNextProducts.length) {
+            setHasMore(false);
+            return previousResult;
+          }
+
+          if (uniqueNextProducts.length < PAGE_SIZE) {
+            setHasMore(false);
+          }
+
+          return {
+            ...previousResult,
+            products: [...previousProducts, ...uniqueNextProducts],
+          };
+        },
+      });
+    } catch (fetchError) {
+      const statusCode = getStatusCode(fetchError);
+      if (statusCode === 429) {
+        setNextLoadMoreAt(Date.now() + PAGINATION_RATE_LIMIT_COOLDOWN_MS);
+        setPaginationNotice('Rate limit reached. Pausing auto-load briefly.');
+      } else {
+        setPaginationNotice('Unable to load more products right now.');
+      }
+      console.error('Failed to load more products:', fetchError);
+    } finally {
+      loadMoreInFlightRef.current = false;
+      setPaginating(false);
+    }
+  }, [
+    fetchMore,
+    hasMore,
+    isFetchingMore,
+    isInitialLoading,
+    nextLoadMoreAt,
+    productQueryVariables,
+    products.length,
+  ]);
+
+  const handleEndReached = useCallback(() => {
+    if (endReachedInMomentumRef.current) {
+      return;
+    }
+    endReachedInMomentumRef.current = true;
+    loadMore();
+  }, [loadMore]);
+
+  const handleScrollStart = useCallback(() => {
+    endReachedInMomentumRef.current = false;
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setHasMore(true);
+      setNextLoadMoreAt(0);
+      setPaginationNotice('');
+      setPaginating(false);
+      await refetch({
+        ...productQueryVariables,
+        offset: 0,
+        limit: PAGE_SIZE,
+      });
+    } catch (refreshError) {
+      console.error('Failed to refresh products:', refreshError);
+    }
+  }, [productQueryVariables, refetch]);
+
+  /**
+   * Renders product.
+   * @param {object} params Callback parameters.
+   * @return {React.JSX.Element} Rendered element.
+   */
+  const renderProduct = useCallback(({ item }) => (
+    <ProductCard
+      product={item}
+      onPress={handleNavigateToProductDetail}
+      style={styles.mainProductCard}
+    />
+  ), [handleNavigateToProductDetail]);
+
+  const listHeaderComponent = useMemo(() => (
+    <ProductListDiscoveryHeader
+      isDiscoveryMode={isDiscoveryMode}
+      recommendedProducts={recommendedProducts}
+      trendingProducts={trendingProducts}
+      onProductPress={handleNavigateToProductDetail}
+      recLoading={recLoading}
+      trendingLoading={trendingLoading}
+      loading={loading}
+      productsCount={products.length}
+    />
+  ), [
+    isDiscoveryMode,
+    recommendedProducts,
+    trendingProducts,
+    handleNavigateToProductDetail,
+    recLoading,
+    trendingLoading,
+    loading,
+    products.length,
+  ]);
+
+  const keyExtractor = useCallback((item) => item.id, []);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Products</Text>
-        <TouchableOpacity 
-          onPress={handleLogout}
-          accessibilityLabel="Logout"
-          accessibilityHint="Logout from the application"
-        >
-          <MaterialIcons name="logout" size={24} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <MaterialIcons name="search" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search products..."
-          value={search}
-          onChangeText={setSearch}
+    <>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <ProductListHeaderSection
+          isGuest={isGuest}
+          appliedFilterCount={appliedFilterCount}
+          isSuggestionsLoading={suggestionsLoading}
+          onClearAllFilters={clearAllFilters}
+          onClearSearch={handleClearSearch}
+          onLogout={isGuest ? onSignIn : handleLogout}
+          onOpenFilterModal={handleOpenFilterModal}
+          onOpenSortModal={handleOpenSortModal}
+          onSearchBlur={() => setSearchFocused(false)}
+          onSearchChange={handleSearchChange}
+          onSearchFocus={() => setSearchFocused(true)}
+          onSuggestionPress={handleSelectSuggestion}
+          searchInput={searchInput}
+          selectedSortLabel={selectedSortLabel}
+          showSuggestions={shouldFetchSuggestions}
+          suggestions={suggestions}
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <MaterialIcons name="close" size={20} color="#666" />
-          </TouchableOpacity>
+
+        {isInitialLoading ? (
+          <ProductListSkeletonGrid />
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <MaterialIcons name="cloud-off" size={48} color="#EF4444" />
+            <Text style={styles.errorTitle}>Couldn't load products</Text>
+            <Text style={styles.errorMessage}>
+              Check your connection and try again.
+            </Text>
+            <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={products}
+            renderItem={renderProduct}
+            keyExtractor={keyExtractor}
+            numColumns={2}
+            contentContainerStyle={[
+              styles.productsGrid,
+              { paddingBottom: tabBarHeight + insets.bottom + 24 },
+            ]}
+            onRefresh={handleRefresh}
+            refreshing={isRefreshing}
+            ListHeaderComponent={listHeaderComponent}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.35}
+            onScrollBeginDrag={handleScrollStart}
+            onMomentumScrollBegin={handleScrollStart}
+            initialNumToRender={6}
+            maxToRenderPerBatch={8}
+            windowSize={7}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews
+            ListFooterComponent={
+              (hasMore && isFetchingMore) || paginationNotice ? (
+                <View style={styles.footerLoader}>
+                  {hasMore && isFetchingMore ? (
+                    <ActivityIndicator size="small" color="#1D4ED8" />
+                  ) : (
+                    <Text style={styles.footerNoticeText}>{paginationNotice}</Text>
+                  )}
+                </View>
+              ) : null
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <MaterialIcons name="inventory-2" size={60} color="#CBD5E1" />
+                <Text style={styles.emptyTitle}>
+                  No products match this filter set
+                </Text>
+                <Text style={styles.emptyText}>
+                  Try changing your category, price, or search keywords.
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={resetFiltersAndSearch}
+                >
+                  <Text style={styles.retryButtonText}>Reset filters</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
         )}
-      </View>
+      </SafeAreaView>
 
-      {categoriesData && categoriesData.categories.length > 0 && (
-        <FlatList
-          data={categoriesData.categories}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesList}
-          contentContainerStyle={styles.categoriesContent}
-        />
-      )}
+      <ProductListSortModal
+        debouncedSearch={debouncedSearch}
+        onClose={handleCloseSortModal}
+        onSelectSort={handleSelectSort}
+        selectedSort={selectedSort}
+        visible={isSortModalVisible}
+      />
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-        </View>
-      ) : (
-        <FlatList
-          data={data?.products || []}
-          renderItem={renderProduct}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          contentContainerStyle={styles.productsGrid}
-          onRefresh={refetch}
-          refreshing={loading}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <MaterialIcons name="shopping-bag" size={60} color="#ccc" />
-              <Text style={styles.emptyText}>No products found</Text>
-            </View>
-          }
-        />
-      )}
-    </View>
+      <ProductListFilterModal
+        visible={isFilterModalVisible}
+        onClose={handleCloseFilterModal}
+        categoryOptions={categoryOptions}
+        draftCategories={draftCategories}
+        draftPriceKey={draftPriceKey}
+        draftInStockOnly={draftInStockOnly}
+        onToggleCategory={handleToggleDraftCategory}
+        onSelectPrice={setDraftPriceKey}
+        onToggleInStock={setDraftInStockOnly}
+        onReset={resetDraftFilters}
+        onApply={applyFilterModal}
+      />
+
+      <ChatBot navigation={navigation} />
+    </>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    margin: 15,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  categoriesList: {
-    maxHeight: 50,
-    marginBottom: 10,
-  },
-  categoriesContent: {
-    paddingHorizontal: 15,
-  },
-  categoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  categoryChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  categoryText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  categoryTextActive: {
-    color: '#fff',
-  },
-  productsGrid: {
-    padding: 10,
-  },
-  productCard: {
-    flex: 1,
-    margin: 5,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    overflow: 'hidden',
-    maxWidth: '48%',
-  },
-  productImage: {
-    width: '100%',
-    height: 150,
-    resizeMode: 'cover',
-  },
-  placeholderImage: {
-    width: '100%',
-    height: 150,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  productInfo: {
-    padding: 10,
-  },
-  productName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  productCategory: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    marginTop: 10,
-  },
-});
 
 export default ProductListScreen;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,49 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_SELLER_ORDERS } from '../../graphql/queries';
-import { UPDATE_ORDER_STATUS } from '../../graphql/mutations';
+import { GET_SELLER_ORDERS, GET_SELLER_PRODUCTS } from '../../graphql/queries';
+import { UPDATE_ORDER_STATUS, CANCEL_ORDER } from '../../graphql/mutations';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import theme from '../../theme/theme';
 
+/**
+ * Seller order management screen.
+ * @return {React.JSX.Element} Seller orders UI.
+ */
 const OrdersScreen = () => {
-  const { data, loading, refetch } = useQuery(GET_SELLER_ORDERS);
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const [hasSellerAccess, setHasSellerAccess] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUserRole = async () => {
+      try {
+        const userRole = await AsyncStorage.getItem('userRole');
+        if (isMounted) {
+          setHasSellerAccess(userRole === 'seller');
+        }
+      } catch (error) {
+        if (isMounted) {
+          setHasSellerAccess(false);
+        }
+      }
+    };
+
+    loadUserRole();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const { data, loading, error, refetch } = useQuery(GET_SELLER_ORDERS, {
+    skip: hasSellerAccess !== true,
+  });
 
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, {
     refetchQueries: [{ query: GET_SELLER_ORDERS }],
@@ -26,6 +63,26 @@ const OrdersScreen = () => {
     },
   });
 
+  const [cancelOrder] = useMutation(CANCEL_ORDER, {
+    refetchQueries: [
+      { query: GET_SELLER_ORDERS },
+      { query: GET_SELLER_PRODUCTS },
+    ],
+    awaitRefetchQueries: true,
+    onCompleted: () => {
+      Alert.alert('Success', 'Order cancelled successfully. Stock has been restored.');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  /**
+   * Handles status change.
+   * @param {string} orderId Order identifier.
+   * @param {string} currentStatus Current status value.
+   * @return {void} No return value.
+   */
   const handleStatusChange = (orderId, currentStatus) => {
     const statusFlow = {
       pending: 'confirmed',
@@ -42,8 +99,48 @@ const OrdersScreen = () => {
     updateOrderStatus({ variables: { orderId, status: nextStatus } });
   };
 
+  /**
+   * Handles cancel order.
+   * @param {string} orderId Order identifier.
+   * @param {string} currentStatus Current status value.
+   * @return {void} No return value.
+   */
+  const handleCancelOrder = (orderId, currentStatus) => {
+    if (currentStatus === 'cancelled' || currentStatus === 'delivered') {
+      Alert.alert('Info', 'This order cannot be cancelled');
+      return;
+    }
+
+    Alert.alert(
+      'Cancel Order',
+      'Are you sure you want to cancel this order? Stock will be restored automatically.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: () => {
+            cancelOrder({ variables: { orderId } });
+          },
+        },
+      ]
+    );
+  };
+
+  /**
+   * Renders order.
+   * @param {object} params Callback parameters.
+   * @return {React.JSX.Element} Rendered element.
+   */
   const renderOrder = ({ item }) => {
     const myItems = item.items.filter((i) => i.sellerId);
+    const createdAtValue = Number(item.createdAt);
+    const createdAt = Number.isNaN(createdAtValue)
+      ? new Date(item.createdAt)
+      : new Date(createdAtValue);
+    const createdAtLabel = Number.isNaN(createdAt.getTime())
+      ? 'Date unavailable'
+      : createdAt.toLocaleDateString();
 
     return (
       <View style={styles.orderCard}>
@@ -54,9 +151,7 @@ const OrdersScreen = () => {
           </Text>
         </View>
 
-        <Text style={styles.orderDate}>
-          {new Date(parseInt(item.createdAt)).toLocaleDateString()}
-        </Text>
+        <Text style={styles.orderDate}>{createdAtLabel}</Text>
 
         {myItems.map((orderItem, index) => (
           <View key={index} style={styles.orderItem}>
@@ -72,31 +167,59 @@ const OrdersScreen = () => {
           <Text style={styles.totalText}>
             Total: ${item.totalAmount.toFixed(2)}
           </Text>
-          {item.status !== 'delivered' && item.status !== 'cancelled' && (
-            <TouchableOpacity
-              style={styles.updateButton}
-              onPress={() => handleStatusChange(item.id, item.status)}
-            >
-              <Text style={styles.updateButtonText}>Update Status</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.actionButtons}>
+            {(item.status === 'pending' || item.status === 'confirmed') && (
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => handleCancelOrder(item.id, item.status)}
+              >
+                <MaterialIcons name="cancel" size={16} color="#fff" />
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
+            {item.status !== 'delivered' && item.status !== 'cancelled' && (
+              <TouchableOpacity
+                style={styles.updateButton}
+                onPress={() => handleStatusChange(item.id, item.status)}
+              >
+                <Text style={styles.updateButtonText}>Update Status</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      {loading ? (
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {hasSellerAccess === null || loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : hasSellerAccess === false ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="lock-outline" size={50} color="#EF4444" />
+          <Text style={styles.emptyText}>Seller access required</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="error-outline" size={50} color="#EF4444" />
+          <Text style={styles.emptyText}>Failed to load seller orders</Text>
+          <Text style={styles.errorText}>{error.message}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={data?.sellerOrders || []}
           renderItem={renderOrder}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: tabBarHeight + insets.bottom + 20 },
+          ]}
           onRefresh={refetch}
           refreshing={loading}
           ListEmptyComponent={
@@ -107,14 +230,14 @@ const OrdersScreen = () => {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -122,13 +245,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: {
-    padding: 15,
+    padding: 16,
   },
   orderCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: theme.colors.surface,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -139,14 +269,14 @@ const styles = StyleSheet.create({
   orderId: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.textPrimary,
   },
   status: {
     fontSize: 12,
     fontWeight: 'bold',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 10,
   },
   status_pending: {
     backgroundColor: '#fff3cd',
@@ -164,30 +294,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#c3e6cb',
     color: '#155724',
   },
+  status_cancelled: {
+    backgroundColor: '#f8d7da',
+    color: '#721c24',
+  },
   orderDate: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 10,
   },
   orderItem: {
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: theme.colors.border,
     paddingTop: 10,
     marginTop: 10,
   },
   itemName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: theme.colors.textPrimary,
   },
   itemVariant: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   itemQuantity: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   orderFooter: {
@@ -196,21 +330,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: theme.colors.border,
     paddingTop: 10,
   },
   totalText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: theme.colors.primary,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
   updateButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 10,
   },
   updateButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: theme.colors.danger,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cancelButtonText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
@@ -223,8 +375,28 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginTop: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 6,
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  retryButton: {
+    marginTop: 12,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

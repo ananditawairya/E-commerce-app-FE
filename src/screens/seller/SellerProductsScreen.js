@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,72 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useQuery, useMutation } from '@apollo/client';
+import { NetworkStatus, useQuery, useMutation } from '@apollo/client';
 import { GET_SELLER_PRODUCTS } from '../../graphql/queries';
 import { DELETE_PRODUCT } from '../../graphql/mutations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import theme from '../../theme/theme';
 
-// CHANGE: Accept onLogout prop from parent component
+/**
+ * Seller product list screen.
+ * @param {{
+ *   navigation: object,
+ *   onLogout?: () => Promise<void>,
+ * }} props Screen props.
+ * @return {React.JSX.Element} Seller product management UI.
+ */
 const SellerProductsScreen = ({ navigation, onLogout }) => {
-  const { data, loading, refetch } = useQuery(GET_SELLER_PRODUCTS);
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const [hasSellerAccess, setHasSellerAccess] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUserRole = async () => {
+      try {
+        const userRole = await AsyncStorage.getItem('userRole');
+        if (isMounted) {
+          setHasSellerAccess(userRole === 'seller');
+        }
+      } catch (error) {
+        if (isMounted) {
+          setHasSellerAccess(false);
+        }
+      }
+    };
+
+    loadUserRole();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const {
+    data,
+    loading,
+    error,
+    refetch,
+    networkStatus,
+  } = useQuery(GET_SELLER_PRODUCTS, {
+    fetchPolicy: 'cache-and-network',
+    nextFetchPolicy: 'cache-first',
+    errorPolicy: 'none',
+    notifyOnNetworkStatusChange: true,
+    skip: hasSellerAccess !== true,
+  });
+
+  const sellerProducts = useMemo(
+    () => (Array.isArray(data?.sellerProducts) ? data.sellerProducts : []),
+    [data?.sellerProducts]
+  );
+  const isInitialLoading = hasSellerAccess === null || (loading && sellerProducts.length === 0);
+  const isRefreshing = hasSellerAccess === true
+    && networkStatus === NetworkStatus.refetch;
 
   const [deleteProduct] = useMutation(DELETE_PRODUCT, {
     refetchQueries: [{ query: GET_SELLER_PRODUCTS }],
@@ -28,7 +85,6 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
     },
   });
 
-  // CHANGE: Updated logout handler to use callback instead of navigation reset
   const handleLogout = async () => {
     Alert.alert(
       'Logout',
@@ -39,11 +95,9 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
-            // CHANGE: Use onLogout callback to trigger authentication state change
             if (onLogout) {
               await onLogout();
             } else {
-              // Fallback for cases where callback is not provided
               console.warn('No logout callback provided');
               await AsyncStorage.clear();
             }
@@ -53,6 +107,29 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
     );
   };
 
+  /**
+   * Handles navigate to add product.
+   * @return {void} No return value.
+   */
+  const handleNavigateToAddProduct = () => {
+    navigation.navigate('AddProduct');
+  };
+
+  /**
+   * Handles navigate to edit product.
+   * @param {object} product Product object.
+   * @return {void} No return value.
+   */
+  const handleNavigateToEditProduct = (product) => {
+    navigation.navigate('AddProduct', { product });
+  };
+
+  /**
+   * Handles delete.
+   * @param {string} id Entity identifier.
+   * @param {string} name Display name.
+   * @return {void} No return value.
+   */
   const handleDelete = (id, name) => {
     Alert.alert('Delete Product', `Are you sure you want to delete "${name}"?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -64,6 +141,11 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
     ]);
   };
 
+  /**
+   * Renders product.
+   * @param {object} params Callback parameters.
+   * @return {React.JSX.Element} Rendered element.
+   */
   const renderProduct = ({ item }) => (
     <View style={styles.productCard}>
       <View style={styles.productHeader}>
@@ -78,7 +160,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => navigation.navigate('AddProduct', { product: item })}
+            onPress={() => handleNavigateToEditProduct(item)}
           >
             <MaterialIcons name="edit" size={24} color="#007AFF" />
           </TouchableOpacity>
@@ -97,30 +179,53 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Products</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleLogout}
           accessibilityLabel="Logout"
           accessibilityHint="Logout from the application"
         >
-          <MaterialIcons name="logout" size={24} color="#007AFF" />
+          <MaterialIcons name="logout" size={24} color="#2563EB" />
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {isInitialLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : hasSellerAccess === false ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="lock-outline" size={50} color="#EF4444" />
+          <Text style={styles.emptyText}>Seller access required</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      ) : error ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="error-outline" size={50} color="#EF4444" />
+          <Text style={styles.emptyText}>Failed to load products</Text>
+          <Text style={styles.errorText}>{error.message}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={data?.sellerProducts || []}
+          data={sellerProducts}
           renderItem={renderProduct}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: tabBarHeight + insets.bottom + 20 },
+          ]}
           onRefresh={refetch}
-          refreshing={loading}
+          refreshing={isRefreshing}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MaterialIcons name="inventory" size={60} color="#ccc" />
@@ -131,33 +236,36 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
       )}
 
       <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('AddProduct')}
+        style={[
+          styles.fab,
+          { bottom: tabBarHeight + insets.bottom + 14 },
+        ]}
+        onPress={handleNavigateToAddProduct}
       >
         <MaterialIcons name="add" size={30} color="#fff" />
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: theme.colors.background,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
   },
   loadingContainer: {
     flex: 1,
@@ -165,13 +273,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: {
-    padding: 15,
+    padding: 16,
   },
   productCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: theme.colors.surface,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   productHeader: {
     flexDirection: 'row',
@@ -183,23 +298,23 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   productCategory: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   productPrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: theme.colors.primary,
     marginBottom: 4,
   },
   productStatus: {
     fontSize: 12,
-    color: '#28a745',
+    color: '#16A34A',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -210,7 +325,7 @@ const styles = StyleSheet.create({
   },
   variantsText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 8,
   },
   emptyContainer: {
@@ -221,8 +336,28 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginTop: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 6,
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  retryButton: {
+    marginTop: 12,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  retryButtonText: {
+    color: theme.colors.surface,
+    fontSize: 12,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',
@@ -231,13 +366,13 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
   },
 });

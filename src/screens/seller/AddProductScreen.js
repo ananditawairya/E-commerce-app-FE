@@ -1,23 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Alert,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  Image,
+  View,
 } from 'react-native';
 import { useMutation } from '@apollo/client';
+import { MaterialIcons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { CREATE_PRODUCT, UPDATE_PRODUCT } from '../../graphql/mutations';
 import { GET_SELLER_PRODUCTS } from '../../graphql/queries';
-import { MaterialIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import ImagePickerGrid from './addProduct/components/ImagePickerGrid';
+import VariantEditorCard from './addProduct/components/VariantEditorCard';
+import styles from './addProduct/styles';
 
+const DEFAULT_VARIANT = {
+  name: '',
+  description: '',
+  priceModifier: 0,
+  stock: 0,
+  sku: '',
+  images: [],
+};
+
+const IMAGE_DATA_PREFIX = 'data:image/';
+
+/**
+ * Seller product create/update screen.
+ * @param {{
+ *   route: {params?: {product?: object}},
+ *   navigation: object,
+ * }} props Screen props.
+ * @return {React.JSX.Element} Product form UI.
+ */
 const AddProductScreen = ({ route, navigation }) => {
+  const insets = useSafeAreaInsets();
   const isEdit = !!route.params?.product;
   const product = route.params?.product;
 
@@ -26,19 +49,15 @@ const AddProductScreen = ({ route, navigation }) => {
   const [category, setCategory] = useState(product?.category || '');
   const [basePrice, setBasePrice] = useState(product?.basePrice?.toString() || '');
   const [images, setImages] = useState(product?.images || []);
-  
-  // CHANGE: Initialize with at least one variant for new products
+
   const [variants, setVariants] = useState(
-    product?.variants?.map(v => ({
-      ...v,
-      priceModifier: v.priceModifier || 0,
-      stock: v.stock || 0,
-      images: v.images || [],
-      description: v.description || '',
-    })) || [
-      // CHANGE: Default variant for new products
-      { name: '', description: '', priceModifier: 0, stock: 0, sku: '', images: [] }
-    ]
+    product?.variants?.map((variant) => ({
+      ...variant,
+      priceModifier: variant.priceModifier || 0,
+      stock: variant.stock || 0,
+      images: variant.images || [],
+      description: variant.description || '',
+    })) || [{ ...DEFAULT_VARIANT }]
   );
 
   const [createProduct, { loading: createLoading }] = useMutation(CREATE_PRODUCT, {
@@ -97,6 +116,13 @@ const AddProductScreen = ({ route, navigation }) => {
     quality: 0.8,
   };
 
+  /**
+   * Checks whether valid base64 image.
+   * @param {string} uri Image URI string.
+   * @return {boolean} Whether the condition is met.
+   */
+  const isValidBase64Image = (uri) => uri && uri.startsWith(IMAGE_DATA_PREFIX);
+
   const convertToBase64 = async (fileUri) => {
     try {
       if (!fileUri || typeof fileUri !== 'string') {
@@ -111,14 +137,14 @@ const AddProductScreen = ({ route, navigation }) => {
       const base64 = await FileSystem.readAsStringAsync(fileUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      
+
       if (!base64 || base64.length === 0) {
         throw new Error('Failed to read file content');
       }
 
       const extension = fileUri.split('.').pop().toLowerCase();
       const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
-      
+
       return `data:${mimeType};base64,${base64}`;
     } catch (error) {
       console.error('Error converting to base64:', error);
@@ -126,58 +152,68 @@ const AddProductScreen = ({ route, navigation }) => {
     }
   };
 
+  /**
+   * Validates image uri.
+   * @param {string} uri Image URI string.
+   * @return {boolean} Whether the URI is valid.
+   */
   const validateImageUri = (uri) => {
-    if (!uri || typeof uri !== 'string') return false;
-    
+    if (!uri || typeof uri !== 'string') {
+      return false;
+    }
+
     const isDataUri = uri.startsWith('data:image/');
     const isFileUri = uri.startsWith('file:///');
-    
-    if (!isDataUri && !isFileUri) return false;
-    
+
+    if (!isDataUri && !isFileUri) {
+      return false;
+    }
+
     if (isFileUri) {
       const hasExtension = /\.(jpg|jpeg|png|gif|webp)$/i.test(uri);
-      if (!hasExtension) return false;
+      if (!hasExtension) {
+        return false;
+      }
     }
-    
+
     if (isDataUri) {
       const parts = uri.split(',');
-      if (parts.length !== 2 || !parts[1] || parts[1].length === 0) return false;
+      if (parts.length !== 2 || !parts[1] || parts[1].length === 0) {
+        return false;
+      }
     }
-    
+
     return true;
+  };
+
+  const convertAssetsToBase64 = async (assets) => {
+    const validUris = assets.map((asset) => asset.uri).filter(validateImageUri);
+
+    if (validUris.length === 0) {
+      Alert.alert('Error', 'No valid images selected');
+      return [];
+    }
+
+    if (validUris.length > 3) {
+      Alert.alert('Processing', `Converting ${validUris.length} images...`);
+    }
+
+    const base64Images = await Promise.all(validUris.map(convertToBase64));
+    return base64Images.filter(isValidBase64Image);
   };
 
   const handlePickProductImages = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
       if (!result.canceled && result.assets) {
-        const validUris = result.assets
-          .map(a => a.uri)
-          .filter(uri => validateImageUri(uri));
-
-        if (validUris.length === 0) {
-          Alert.alert('Error', 'No valid images selected');
-          return;
-        }
-
-        if (validUris.length > 3) {
-          Alert.alert('Processing', `Converting ${validUris.length} images...`);
-        }
-
-        const base64Images = await Promise.all(
-          validUris.map(uri => convertToBase64(uri))
-        );
-
-        const validBase64Images = base64Images.filter(img => 
-          img && img.startsWith('data:image/')
-        );
+        const validBase64Images = await convertAssetsToBase64(result.assets);
 
         if (validBase64Images.length === 0) {
           Alert.alert('Error', 'Failed to process images');
           return;
         }
 
-        setImages(prev => [...prev, ...validBase64Images]);
+        setImages((prev) => [...prev, ...validBase64Images]);
       }
     } catch (error) {
       console.error('Image picker error:', error);
@@ -185,37 +221,27 @@ const AddProductScreen = ({ route, navigation }) => {
     }
   };
 
+  /**
+   * Handles remove product image.
+   * @param {number} index Item index.
+   * @return {void} No return value.
+   */
   const handleRemoveProductImage = (index) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
   };
 
   const handlePickVariantImages = async (variantIndex) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
       if (!result.canceled && result.assets) {
-        const validUris = result.assets
-          .map(a => a.uri)
-          .filter(uri => validateImageUri(uri));
-
-        if (validUris.length === 0) {
-          Alert.alert('Error', 'No valid images selected');
-          return;
-        }
-
-        const base64Images = await Promise.all(
-          validUris.map(uri => convertToBase64(uri))
-        );
-
-        const validBase64Images = base64Images.filter(img => 
-          img && img.startsWith('data:image/')
-        );
+        const validBase64Images = await convertAssetsToBase64(result.assets);
 
         if (validBase64Images.length === 0) {
           Alert.alert('Error', 'Failed to process images');
           return;
         }
 
-        setVariants(prev => {
+        setVariants((prev) => {
           const next = [...prev];
           next[variantIndex] = {
             ...next[variantIndex],
@@ -230,26 +256,39 @@ const AddProductScreen = ({ route, navigation }) => {
     }
   };
 
+  /**
+   * Handles remove variant image.
+   * @param {number} variantIndex Variant index.
+   * @param {number} imageIndex Image index.
+   * @return {void} No return value.
+   */
   const handleRemoveVariantImage = (variantIndex, imageIndex) => {
-    setVariants(prev => {
+    setVariants((prev) => {
       const next = [...prev];
       next[variantIndex] = {
         ...next[variantIndex],
-        images: next[variantIndex].images.filter((_, i) => i !== imageIndex),
+        images: next[variantIndex].images.filter(
+          (_, currentIndex) => currentIndex !== imageIndex
+        ),
       };
       return next;
     });
   };
 
+  /**
+   * Handles add variant.
+   * @return {void} No return value.
+   */
   const handleAddVariant = () => {
-    setVariants(prev => [
-      ...prev,
-      { name: '', description: '', priceModifier: 0, stock: 0, sku: '', images: [] },
-    ]);
+    setVariants((prev) => [...prev, { ...DEFAULT_VARIANT }]);
   };
 
+  /**
+   * Handles remove variant.
+   * @param {number} index Item index.
+   * @return {void} No return value.
+   */
   const handleRemoveVariant = (index) => {
-    // CHANGE: Prevent removing the last variant
     if (variants.length === 1) {
       Alert.alert(
         'Cannot Remove Variant',
@@ -258,18 +297,29 @@ const AddProductScreen = ({ route, navigation }) => {
       );
       return;
     }
-    
-    setVariants(prev => prev.filter((_, i) => i !== index));
+
+    setVariants((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
+  /**
+   * Handles variant change.
+   * @param {number} index Item index.
+   * @param {string} field Field value.
+   * @param {string} value Field value.
+   * @return {void} No return value.
+   */
   const handleVariantChange = (index, field, value) => {
-    setVariants(prev => {
+    setVariants((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
       return next;
     });
   };
 
+  /**
+   * Validates input.
+   * @return {boolean} Whether the form input is valid.
+   */
   const validateInput = () => {
     if (!name || name.trim().length === 0) {
       Alert.alert('Validation Error', 'Product name is required');
@@ -297,13 +347,15 @@ const AddProductScreen = ({ route, navigation }) => {
       return false;
     }
 
-    const invalidImages = images.filter(img => !img.startsWith('data:image/'));
+    const invalidImages = images.filter((image) => !isValidBase64Image(image));
     if (invalidImages.length > 0) {
-      Alert.alert('Validation Error', 'Some images are invalid. Please remove and re-add them.');
+      Alert.alert(
+        'Validation Error',
+        'Some images are invalid. Please remove and re-add them.'
+      );
       return false;
     }
 
-    // CHANGE: Enhanced variant validation with mandatory check
     if (!variants || variants.length === 0) {
       Alert.alert(
         'Validation Error',
@@ -312,30 +364,42 @@ const AddProductScreen = ({ route, navigation }) => {
       return false;
     }
 
-    for (let i = 0; i < variants.length; i++) {
-      const variant = variants[i];
-      
+    for (let index = 0; index < variants.length; index += 1) {
+      const variant = variants[index];
+
       if (!variant.name || variant.name.trim().length === 0) {
-        Alert.alert('Validation Error', `Variant ${i + 1} name is required`);
+        Alert.alert('Validation Error', `Variant ${index + 1} name is required`);
         return false;
       }
 
-      const stock = parseInt(variant.stock);
+      const stock = parseInt(variant.stock, 10);
       if (isNaN(stock) || stock < 0) {
-        Alert.alert('Validation Error', `Variant ${i + 1} stock must be a non-negative number`);
+        Alert.alert(
+          'Validation Error',
+          `Variant ${index + 1} stock must be a non-negative number`
+        );
         return false;
       }
 
       const priceModifier = parseFloat(variant.priceModifier);
       if (isNaN(priceModifier)) {
-        Alert.alert('Validation Error', `Variant ${i + 1} price modifier must be a number`);
+        Alert.alert(
+          'Validation Error',
+          `Variant ${index + 1} price modifier must be a number`
+        );
         return false;
       }
 
       if (variant.images && variant.images.length > 0) {
-        const invalidVariantImages = variant.images.filter(img => !img.startsWith('data:image/'));
+        const invalidVariantImages = variant.images.filter(
+          (image) => !isValidBase64Image(image)
+        );
+
         if (invalidVariantImages.length > 0) {
-          Alert.alert('Validation Error', `Variant ${i + 1} has invalid images. Please remove and re-add them.`);
+          Alert.alert(
+            'Validation Error',
+            `Variant ${index + 1} has invalid images. Please remove and re-add them.`
+          );
           return false;
         }
       }
@@ -344,29 +408,37 @@ const AddProductScreen = ({ route, navigation }) => {
     return true;
   };
 
+  /**
+   * Handles submit.
+   * @return {void} No return value.
+   */
   const handleSubmit = () => {
     if (!validateInput()) {
       return;
     }
 
     const timestamp = Date.now();
-    const productSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 20);
+    const productSlug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .substring(0, 20);
 
     const input = {
       name: name.trim(),
       description: description.trim(),
       category: category.trim(),
       basePrice: parseFloat(basePrice),
-      images: images.filter(img => img && img.startsWith('data:image/')),
-      variants: variants.map((v, index) => ({
-        name: v.name.trim(),
-        description: v.description ? v.description.trim() : '',
-        priceModifier: parseFloat(v.priceModifier) || 0,
-        stock: parseInt(v.stock) || 0,
-        sku: v.sku && v.sku.trim() !== ''
-          ? v.sku.trim()
-          : `${productSlug}-${timestamp}-${index}`,
-        images: (v.images || []).filter(img => img && img.startsWith('data:image/')),
+      images: images.filter(isValidBase64Image),
+      variants: variants.map((variant, index) => ({
+        name: variant.name.trim(),
+        description: variant.description ? variant.description.trim() : '',
+        priceModifier: parseFloat(variant.priceModifier) || 0,
+        stock: parseInt(variant.stock, 10) || 0,
+        sku:
+          variant.sku && variant.sku.trim() !== ''
+            ? variant.sku.trim()
+            : `${productSlug}-${timestamp}-${index}`,
+        images: (variant.images || []).filter(isValidBase64Image),
       })),
     };
 
@@ -378,11 +450,11 @@ const AddProductScreen = ({ route, navigation }) => {
       basePrice: input.basePrice,
       imageCount: input.images.length,
       variantCount: input.variants.length,
-      variants: input.variants.map(v => ({
-        name: v.name,
-        stock: v.stock,
-        priceModifier: v.priceModifier,
-        imageCount: v.images.length,
+      variants: input.variants.map((variant) => ({
+        name: variant.name,
+        stock: variant.stock,
+        priceModifier: variant.priceModifier,
+        imageCount: variant.images.length,
       })),
     });
 
@@ -413,7 +485,11 @@ const AddProductScreen = ({ route, navigation }) => {
   const loading = createLoading || updateLoading;
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+      >
       <TextInput
         style={styles.input}
         placeholder="Product Name *"
@@ -446,126 +522,38 @@ const AddProductScreen = ({ route, navigation }) => {
       />
 
       <Text style={styles.sectionTitle}>Product Images *</Text>
-      <View style={styles.imagesContainer}>
-        {images.map((uri, index) => (
-          <View key={`${uri.substring(0, 20)}-${index}`} style={styles.imageWrapper}>
-            <Image source={{ uri }} style={styles.imagePreview} />
-            <TouchableOpacity
-              style={styles.removeImageButton}
-              onPress={() => handleRemoveProductImage(index)}
-              accessibilityRole="button"
-              accessibilityLabel={`Remove image ${index + 1}`}
-            >
-              <MaterialIcons name="close" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        ))}
-        <TouchableOpacity
-          style={styles.addImageButton}
-          onPress={handlePickProductImages}
-          accessibilityRole="button"
-          accessibilityLabel="Add images"
-        >
-          <MaterialIcons name="add-photo-alternate" size={40} color="#007AFF" />
-          <Text style={styles.addImageText}>Add Images</Text>
-        </TouchableOpacity>
-      </View>
+      <ImagePickerGrid
+        images={images}
+        onRemoveImage={handleRemoveProductImage}
+        onAddImage={handlePickProductImages}
+        removeAccessibilityLabel={(index) => `Remove image ${index + 1}`}
+        addLabel="Add images"
+      />
 
-      {/* CHANGE: Updated section title and helper text to indicate variants are mandatory */}
       <Text style={styles.sectionTitle}>Variants (Required) *</Text>
       <Text style={styles.helperText}>
-        At least one variant is required for stock management. Add variant-specific descriptions and images, or they will inherit from the product.
+        At least one variant is required for stock management. Add variant-specific
+        descriptions and images, or they will inherit from the product.
       </Text>
-      {/* CHANGE: Added info box to emphasize mandatory variants */}
       <View style={styles.infoBox}>
-        <MaterialIcons name="info-outline" size={20} color="#007AFF" />
+        <MaterialIcons name="info-outline" size={20} color="#2563EB" />
         <Text style={styles.infoText}>
-          Each variant tracks its own stock. You must have at least one variant to manage inventory.
+          Each variant tracks its own stock. You must have at least one variant to
+          manage inventory.
         </Text>
       </View>
 
       {variants.map((variant, index) => (
-        <View key={index} style={styles.variantCard}>
-          <View style={styles.variantHeader}>
-            <Text style={styles.variantTitle}>Variant {index + 1}</Text>
-            {/* CHANGE: Show remove button only if more than one variant exists */}
-            {variants.length > 1 && (
-              <TouchableOpacity 
-                onPress={() => handleRemoveVariant(index)} 
-                accessibilityRole="button" 
-                accessibilityLabel={`Remove variant ${index + 1}`}
-              >
-                <MaterialIcons name="close" size={24} color="#ff3b30" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Variant Name (e.g., Size: L) *"
-            value={variant.name}
-            onChangeText={(text) => handleVariantChange(index, 'name', text)}
-          />
-
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Variant Description (optional - inherits product description if empty)"
-            value={variant.description}
-            onChangeText={(text) => handleVariantChange(index, 'description', text)}
-            multiline
-            numberOfLines={3}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Price Modifier (default: 0)"
-            value={variant.priceModifier?.toString()}
-            onChangeText={(text) => handleVariantChange(index, 'priceModifier', text)}
-            keyboardType="decimal-pad"
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Stock (default: 0) *"
-            value={variant.stock?.toString()}
-            onChangeText={(text) => handleVariantChange(index, 'stock', text)}
-            keyboardType="number-pad"
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="SKU (optional - auto-generated if empty)"
-            value={variant.sku}
-            onChangeText={(text) => handleVariantChange(index, 'sku', text)}
-          />
-
-          <Text style={styles.variantImageLabel}>
-            Variant Images (optional - inherits product images if empty)
-          </Text>
-          <View style={styles.imagesContainer}>
-            {(variant.images || []).map((uri, imgIndex) => (
-              <View key={`${uri.substring(0, 20)}-${imgIndex}`} style={styles.imageWrapper}>
-                <Image source={{ uri }} style={styles.imagePreview} />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() => handleRemoveVariantImage(index, imgIndex)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove variant image ${imgIndex + 1}`}
-                >
-                  <MaterialIcons name="close" size={16} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ))}
-            <TouchableOpacity
-              style={styles.addImageButtonSmall}
-              onPress={() => handlePickVariantImages(index)}
-              accessibilityRole="button"
-              accessibilityLabel={`Add images to variant ${index + 1}`}
-            >
-              <MaterialIcons name="add-photo-alternate" size={30} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <VariantEditorCard
+          key={`variant-${index}`}
+          index={index}
+          variant={variant}
+          totalVariants={variants.length}
+          onRemoveVariant={handleRemoveVariant}
+          onVariantChange={handleVariantChange}
+          onPickVariantImages={handlePickVariantImages}
+          onRemoveVariantImage={handleRemoveVariantImage}
+        />
       ))}
 
       <TouchableOpacity
@@ -574,7 +562,7 @@ const AddProductScreen = ({ route, navigation }) => {
         accessibilityRole="button"
         accessibilityLabel="Add variant"
       >
-        <MaterialIcons name="add-circle-outline" size={20} color="#007AFF" />
+        <MaterialIcons name="add-circle-outline" size={20} color="#2563EB" />
         <Text style={styles.addVariantText}>Add Another Variant</Text>
       </TouchableOpacity>
 
@@ -593,64 +581,9 @@ const AddProductScreen = ({ route, navigation }) => {
           </Text>
         )}
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', padding: 20 },
-  input: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
-    padding: 15, fontSize: 16, marginBottom: 15,
-  },
-  textArea: { height: 100, textAlignVertical: 'top' },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#333', marginTop: 10, marginBottom: 15 },
-  helperText: { fontSize: 13, color: '#666', marginBottom: 10, fontStyle: 'italic' },
-  // CHANGE: Add info box styling for mandatory variant notice
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e3f2fd',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 15,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#0d47a1',
-    marginLeft: 10,
-    lineHeight: 18,
-  },
-  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 15, gap: 10 },
-  imageWrapper: { position: 'relative', width: 100, height: 100 },
-  imagePreview: { width: 100, height: 100, borderRadius: 8, backgroundColor: '#f0f0f0' },
-  removeImageButton: {
-    position: 'absolute', top: -5, right: -5, backgroundColor: '#ff3b30', borderRadius: 12,
-    width: 24, height: 24, justifyContent: 'center', alignItems: 'center',
-  },
-  addImageButton: {
-    width: 100, height: 100, borderWidth: 2, borderColor: '#007AFF', borderStyle: 'dashed',
-    borderRadius: 8, justifyContent: 'center', alignItems: 'center',
-  },
-  addImageButtonSmall: {
-    width: 100, height: 100, borderWidth: 1, borderColor: '#007AFF', borderStyle: 'dashed',
-    borderRadius: 8, justifyContent: 'center', alignItems: 'center',
-  },
-  addImageText: { color: '#007AFF', fontSize: 12, marginTop: 5 },
-  variantCard: { backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#007AFF' },
-  variantHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  variantTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
-  variantImageLabel: { fontSize: 14, fontWeight: '500', color: '#666', marginBottom: 8 },
-  addVariantButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15,
-    borderWidth: 1, borderColor: '#007AFF', borderRadius: 8, borderStyle: 'dashed', marginBottom: 20,
-  },
-  addVariantText: { color: '#007AFF', fontSize: 16, fontWeight: '600', marginLeft: 5 },
-  submitButton: { backgroundColor: '#007AFF', borderRadius: 8, padding: 16, alignItems: 'center', marginBottom: 30 },
-  submitButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-});
 
 export default AddProductScreen;
