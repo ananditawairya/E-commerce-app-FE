@@ -505,17 +505,6 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
                     ]}>
                       {variant.name}
                     </Text>
-                    {!!getVariantDisplayDescription(variant, product) && (
-                      <Text
-                        style={[
-                          styles.variantDescription,
-                          variant.stock === 0 && styles.variantDescriptionOutOfStock,
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {getVariantDisplayDescription(variant, product)}
-                      </Text>
-                    )}
                     <Text style={[
                       styles.variantStock,
                       variant.stock === 0 && styles.outOfStockText
@@ -618,7 +607,17 @@ const ProductDetailScreen = ({ route, navigation, isGuest, onSignIn }) => {
               title="Similar Products"
               products={similarData.getSimilarProducts.map(rec => {
                 const enriched = allProductsData?.products?.find(p => p.id === rec.productId);
-                return enriched ? { ...enriched, ...rec } : null;
+                if (!enriched) {
+                  return null;
+                }
+
+                return {
+                  ...enriched,
+                  productId: rec.productId || enriched.id,
+                  score: rec.score,
+                  reason: rec.reason,
+                  category: enriched.category || rec.category || null,
+                };
               }).filter(p => p !== null)}
               onProductPress={(p) => navigation.push('ProductDetail', { product: p })}
               loading={similarLoading}

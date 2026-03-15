@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useQuery } from '@apollo/client';
+import { NetworkStatus, useQuery } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GET_SELLER_ANALYTICS } from '../../graphql/queries';
@@ -34,6 +36,9 @@ import {
 const AnalyticsScreen = () => {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+  const isFocused = useIsFocused();
+  const wasFocusedRef = useRef(false);
+  const hasSeenInitialFocusRef = useRef(false);
   const [days, setDays] = useState(7);
   const [hasSellerAccess, setHasSellerAccess] = useState(null);
 
@@ -60,13 +65,21 @@ const AnalyticsScreen = () => {
     };
   }, []);
 
-  const { data, loading, error, refetch } = useQuery(GET_SELLER_ANALYTICS, {
+  const {
+    data,
+    loading,
+    error,
+    refetch,
+    networkStatus,
+  } = useQuery(GET_SELLER_ANALYTICS, {
     variables: { days },
     fetchPolicy: 'network-only',
     nextFetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
     skip: hasSellerAccess !== true,
   });
+  const isRefreshing = hasSellerAccess === true
+    && networkStatus === NetworkStatus.refetch;
 
   const analytics = data?.sellerAnalytics || {
     totalRevenue: 0,
@@ -119,10 +132,51 @@ const AnalyticsScreen = () => {
     });
   }, [data, days]);
 
+  const handleRefresh = React.useCallback(async () => {
+    if (hasSellerAccess !== true) {
+      return;
+    }
+
+    try {
+      await refetch({ days });
+    } catch (refreshError) {
+      console.error('Failed to refresh seller analytics:', refreshError);
+    }
+  }, [days, hasSellerAccess, refetch]);
+
+  useEffect(() => {
+    if (!isFocused) {
+      wasFocusedRef.current = false;
+      return;
+    }
+
+    if (wasFocusedRef.current) {
+      return;
+    }
+
+    wasFocusedRef.current = true;
+
+    if (!hasSeenInitialFocusRef.current) {
+      hasSeenInitialFocusRef.current = true;
+      return;
+    }
+
+    if (hasSellerAccess === true) {
+      handleRefresh();
+    }
+  }, [handleRefresh, hasSellerAccess, isFocused]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView
         style={styles.container}
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        )}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: tabBarHeight + insets.bottom + 18 },

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useQuery, useMutation } from '@apollo/client';
+import { NetworkStatus, useQuery, useMutation } from '@apollo/client';
+import { useIsFocused } from '@react-navigation/native';
 import { GET_SELLER_ORDERS, GET_SELLER_PRODUCTS } from '../../graphql/queries';
 import { UPDATE_ORDER_STATUS, CANCEL_ORDER } from '../../graphql/mutations';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -24,6 +25,9 @@ import theme from '../../theme/theme';
 const OrdersScreen = () => {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+  const isFocused = useIsFocused();
+  const wasFocusedRef = useRef(false);
+  const hasSeenInitialFocusRef = useRef(false);
   const [hasSellerAccess, setHasSellerAccess] = useState(null);
 
   useEffect(() => {
@@ -49,9 +53,56 @@ const OrdersScreen = () => {
     };
   }, []);
 
-  const { data, loading, error, refetch } = useQuery(GET_SELLER_ORDERS, {
+  const {
+    data,
+    loading,
+    error,
+    refetch,
+    networkStatus,
+  } = useQuery(GET_SELLER_ORDERS, {
+    fetchPolicy: 'cache-and-network',
+    nextFetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: true,
     skip: hasSellerAccess !== true,
   });
+  const sellerOrders = Array.isArray(data?.sellerOrders) ? data.sellerOrders : [];
+  const isInitialLoading = hasSellerAccess === null || (loading && sellerOrders.length === 0);
+  const isRefreshing = hasSellerAccess === true
+    && networkStatus === NetworkStatus.refetch;
+
+  const handleRefresh = React.useCallback(async () => {
+    if (hasSellerAccess !== true) {
+      return;
+    }
+
+    try {
+      await refetch();
+    } catch (refreshError) {
+      console.error('Failed to refresh seller orders:', refreshError);
+    }
+  }, [hasSellerAccess, refetch]);
+
+  useEffect(() => {
+    if (!isFocused) {
+      wasFocusedRef.current = false;
+      return;
+    }
+
+    if (wasFocusedRef.current) {
+      return;
+    }
+
+    wasFocusedRef.current = true;
+
+    if (!hasSeenInitialFocusRef.current) {
+      hasSeenInitialFocusRef.current = true;
+      return;
+    }
+
+    if (hasSellerAccess === true) {
+      handleRefresh();
+    }
+  }, [handleRefresh, hasSellerAccess, isFocused]);
 
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, {
     refetchQueries: [{ query: GET_SELLER_ORDERS }],
@@ -193,7 +244,7 @@ const OrdersScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {hasSellerAccess === null || loading ? (
+      {isInitialLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
@@ -213,15 +264,15 @@ const OrdersScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={data?.sellerOrders || []}
+          data={sellerOrders}
           renderItem={renderOrder}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
             styles.list,
             { paddingBottom: tabBarHeight + insets.bottom + 20 },
           ]}
-          onRefresh={refetch}
-          refreshing={loading}
+          onRefresh={handleRefresh}
+          refreshing={isRefreshing}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MaterialIcons name="list-alt" size={60} color="#ccc" />

@@ -54,7 +54,17 @@ function enrichProducts(recommendations, products) {
       const product = products.find(
         (item) => item.id === recommendation.productId
       );
-      return product ? { ...product, ...recommendation } : null;
+      if (!product) {
+        return null;
+      }
+
+      return {
+        ...product,
+        productId: recommendation.productId || product.id,
+        score: recommendation.score,
+        reason: recommendation.reason,
+        category: product.category || recommendation.category || null,
+      };
     })
     .filter(Boolean);
 }

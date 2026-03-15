@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { NetworkStatus, useQuery, useMutation } from '@apollo/client';
+import { useIsFocused } from '@react-navigation/native';
 import { GET_SELLER_PRODUCTS } from '../../graphql/queries';
 import { DELETE_PRODUCT } from '../../graphql/mutations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +29,9 @@ import theme from '../../theme/theme';
 const SellerProductsScreen = ({ navigation, onLogout }) => {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+  const isFocused = useIsFocused();
+  const wasFocusedRef = useRef(false);
+  const hasSeenInitialFocusRef = useRef(false);
   const [hasSellerAccess, setHasSellerAccess] = useState(null);
 
   useEffect(() => {
@@ -74,6 +78,40 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
   const isInitialLoading = hasSellerAccess === null || (loading && sellerProducts.length === 0);
   const isRefreshing = hasSellerAccess === true
     && networkStatus === NetworkStatus.refetch;
+
+  const handleRefresh = React.useCallback(async () => {
+    if (hasSellerAccess !== true) {
+      return;
+    }
+
+    try {
+      await refetch();
+    } catch (refreshError) {
+      console.error('Failed to refresh seller products:', refreshError);
+    }
+  }, [hasSellerAccess, refetch]);
+
+  useEffect(() => {
+    if (!isFocused) {
+      wasFocusedRef.current = false;
+      return;
+    }
+
+    if (wasFocusedRef.current) {
+      return;
+    }
+
+    wasFocusedRef.current = true;
+
+    if (!hasSeenInitialFocusRef.current) {
+      hasSeenInitialFocusRef.current = true;
+      return;
+    }
+
+    if (hasSellerAccess === true) {
+      handleRefresh();
+    }
+  }, [handleRefresh, hasSellerAccess, isFocused]);
 
   const [deleteProduct] = useMutation(DELETE_PRODUCT, {
     refetchQueries: [{ query: GET_SELLER_PRODUCTS }],
@@ -224,7 +262,7 @@ const SellerProductsScreen = ({ navigation, onLogout }) => {
             styles.list,
             { paddingBottom: tabBarHeight + insets.bottom + 20 },
           ]}
-          onRefresh={refetch}
+          onRefresh={handleRefresh}
           refreshing={isRefreshing}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
