@@ -105,7 +105,7 @@ const AnalyticsScreen = () => {
   );
 
   const metricItems = useMemo(() => ([
-    { label: 'Revenue', value: formatCurrency(analytics.totalRevenue) },
+    { label: 'Total Revenue', value: formatCurrency(analytics.totalRevenue) },
     { label: 'Orders', value: String(analytics.totalOrders || 0) },
     { label: 'Avg Order', value: formatCurrency(analytics.averageOrderValue) },
     { label: 'Completion', value: formatPercent(completionRate) },
@@ -219,7 +219,7 @@ const AnalyticsScreen = () => {
             <AnalyticsStatusBreakdown statuses={statusBreakdown} />
 
             <AnalyticsTrendChartCard
-              title="Revenue Trend"
+              title="Total Revenue Trend"
               labels={trendData.labels}
               data={trendData.revenue}
               yAxisLabel="$"

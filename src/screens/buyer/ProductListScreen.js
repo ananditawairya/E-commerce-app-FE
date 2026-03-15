@@ -447,6 +447,7 @@ const ProductListScreen = ({ navigation, onLogout, isGuest, onSignIn }) => {
     const nextSearch = suggestionText.trim();
     setSearchInput(nextSearch);
     setDebouncedSearch(nextSearch);
+    setSelectedSort('RELEVANCE');
     setSearchFocused(false);
   }, []);
 
